@@ -7,7 +7,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-def add_traces(figure, data_struct, group: str = 'G1', name: str = '', **kwargs):
+def add_traces(figure, data_struct, group: str = 'G1', mode: str = None, name: str = '',
+               showlegend: bool = True, **kwargs):
     if isinstance(data_struct, pd.DataFrame):
         xvalues = list(data_struct.index)
         for col in data_struct.columns:
@@ -16,7 +17,10 @@ def add_traces(figure, data_struct, group: str = 'G1', name: str = '', **kwargs)
                     x=xvalues,
                     y=data_struct[col],
                     name=name+col,
+                    mode=mode,
                     legendgroup=group,
+                    legendgrouptitle_text=group,
+                    showlegend=showlegend,
                 ),
                 **kwargs
             )
@@ -26,13 +30,17 @@ def add_traces(figure, data_struct, group: str = 'G1', name: str = '', **kwargs)
                 x=list(data_struct.index),
                 y=list(data_struct.values),
                 name=name,
+                mode=mode,
                 legendgroup=group,
+                legendgrouptitle_text=group,
+                showlegend=showlegend,
             ),
             **kwargs
         )
     elif isinstance(data_struct, dict):
         for k, v in data_struct.items():
-            add_traces(figure, v, group=group, name=name+k, **kwargs)
+            add_traces(figure, v, group=group, mode=mode, name=name+k,
+                       showlegend=showlegend, **kwargs)
     else:
         raise Exception("Unrecognized datatype")
     # if isinstance(v, pd.DataFrame):
@@ -46,15 +54,18 @@ def add_traces(figure, data_struct, group: str = 'G1', name: str = '', **kwargs)
     #     raise Exception("Unrecognized datatype")
     # ax1.legend(loc=2)
     # ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    #     ax2 = ax1.twinx()
+    #     ax2.set_ylabel('Price')
+    #     ax2.set_prop_cycle(cycler(color=['b', 'r', 'k', 'g', 'c', 'm', 'y']))
 
-def plot_series(data, data2=None, title: str = 'Series',
+def get_figure(data, data2=None, title: str = 'Series',
                 x_name: str = 'Time', x_format: str = '%H:%M',
                 y_name: str = 'Price', y_format: str = None,
                 y2_name: str = 'Spread', y2_format: str = None):
     if data2 is not None:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
-        add_traces(fig, data)
-        add_traces(fig, data2, secondary_y=True)
+        add_traces(fig, data, group=y_name)
+        add_traces(fig, data2, group=y2_name, mode='lines', secondary_y=True)
     else:
         fig = go.Figure()
         add_traces(fig, data)
@@ -73,10 +84,16 @@ def plot_series(data, data2=None, title: str = 'Series',
             tickformat=y2_format,
         ),
     )
-    fig.show()
-    #     ax2 = ax1.twinx()
-    #     ax2.set_ylabel('Price')
-    #     ax2.set_prop_cycle(cycler(color=['b', 'r', 'k', 'g', 'c', 'm', 'y']))
+    return fig
+
+def plot_series(data, data2=None, title: str = 'Series',
+                x_name: str = 'Time', x_format: str = '%H:%M',
+                y_name: str = 'Price', y_format: str = None,
+                y2_name: str = 'Spread', y2_format: str = None):
+    get_figure(data, data2=data2, title=title,
+               x_name=x_name, x_format=x_format,
+               y_name=y_name, y_format=y_format,
+               y2_name=y2_name, y2_format=y2_format).show()
 
 def plot_series_multiple(data: dict, title: str = 'Multi plots',
                          x_name: str = 'Time', x_format: str = '%H:%M',
