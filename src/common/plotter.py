@@ -61,7 +61,8 @@ def add_traces(figure, data_struct, group: str = 'G1', mode: str = None, name: s
 def get_figure(data, data2=None, title: str = 'Series',
                 x_name: str = 'Time', x_format: str = '%H:%M',
                 y_name: str = 'Price', y_format: str = None,
-                y2_name: str = 'Spread', y2_format: str = None):
+                y2_name: str = 'Spread', y2_format: str = None,
+                hovermode: str = None):
     if data2 is not None:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         add_traces(fig, data, group=y_name)
@@ -83,17 +84,20 @@ def get_figure(data, data2=None, title: str = 'Series',
             title=y2_name,
             tickformat=y2_format,
         ),
+        hovermode=hovermode,
     )
     return fig
 
 def plot_series(data, data2=None, title: str = 'Series',
                 x_name: str = 'Time', x_format: str = '%H:%M',
                 y_name: str = 'Price', y_format: str = None,
-                y2_name: str = 'Spread', y2_format: str = None):
+                y2_name: str = 'Spread', y2_format: str = None,
+                hovermode: str = None):
     get_figure(data, data2=data2, title=title,
                x_name=x_name, x_format=x_format,
                y_name=y_name, y_format=y_format,
-               y2_name=y2_name, y2_format=y2_format).show()
+               y2_name=y2_name, y2_format=y2_format,
+               hovermode=hovermode).show()
 
 def plot_series_multiple(data: dict, title: str = 'Multi plots',
                          x_name: str = 'Time', x_format: str = '%H:%M',
