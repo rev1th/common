@@ -3,7 +3,6 @@ from pydantic.dataclasses import dataclass
 from dataclasses import InitVar
 from typing import Union, Iterable
 import datetime as dtm
-import calendar as cal_lib
 import holidays
 from zoneinfo import ZoneInfo
 import numpy as np
@@ -56,13 +55,10 @@ class BDayAdjustType(StrEnum):
     Previous = 'P'
     ModifiedFollowing = 'MF'
 
-    def get_date(self, date: dtm.date) -> dtm.date:
-        return get_adjusted_date(self.value, date)
-
 @dataclass()
 class BDayAdjust():
-    _adjust_type: str
-    _calendar: str
+    _adjust_type: str = ''
+    _calendar: str = ''
 
     def get_date(self, date: dtm.date) -> dtm.date:
         return get_adjusted_date(self._adjust_type, date, self._calendar)
@@ -125,7 +121,7 @@ class Tenor():
         return cls(CBDay(n=n, calendar=(get_bdc(calendar) if calendar else None)))
     
     @property
-    def isbackward(self) -> dtm.date:
+    def is_backward(self) -> dtm.date:
         offset = self._offset
         if isinstance(offset, DateOffset):
             return offset.n < 0
@@ -146,26 +142,34 @@ class Tenor():
             return res.date()
         return date + offset
     
-    def get_date(self, date: dtm.date = None, adjust_type: BDayAdjustType = BDayAdjustType.NoAdjust) -> dtm.date:
-        return adjust_type.get_date(self._get_date(date))
+    def get_date(self, date: dtm.date = None, bd_adjust: BDayAdjust = BDayAdjust()) -> dtm.date:
+        return bd_adjust.get_date(self._get_date(date))
     
     # Generates schedule with Tenor for [from_date, to_date]
     def generate_series(self, from_date: dtm.date, to_date: dtm.date,
-                          isbackward: bool = False,
-                          adjust_type: BDayAdjustType = BDayAdjustType.NoAdjust) -> list[dtm.date]:
+                        is_backward: bool = False,
+                        bd_adjust: BDayAdjust = BDayAdjust(),
+                        extended: bool = False, inclusive: bool = True,
+                        ) -> list[dtm.date]:
         schedule = []
-        if isbackward:
+        if is_backward:
             date_i = to_date
-            while date_i >= from_date:
-                date_i_adj = adjust_type.get_date(date_i)
+            while date_i > from_date:
+                date_i_adj = bd_adjust.get_date(date_i)
                 schedule.insert(0, date_i_adj)
                 date_i = self.get_date(date_i)
+            if (inclusive and date_i == from_date) or extended:
+                date_i_adj = bd_adjust.get_date(date_i)
+                schedule.insert(0, date_i_adj)
         else:
             date_i = from_date
-            while date_i <= to_date:
-                date_i_adj = adjust_type.get_date(date_i)
+            while date_i < to_date:
+                date_i_adj = bd_adjust.get_date(date_i)
                 schedule.append(date_i_adj)
                 date_i = self.get_date(date_i)
+            if (inclusive and date_i == to_date) or extended:
+                date_i_adj = bd_adjust.get_date(date_i)
+                schedule.append(date_i_adj)
         return schedule
 
 
@@ -196,21 +200,33 @@ class Frequency(StrEnum):
             case _:
                 raise RuntimeError(f'Cannot parse frequency {self.value}')
     
+    def get_unit_dcf(self) -> float:
+        match self.value.upper():
+            case 'A':
+                return 1.0
+            case 'S':
+                return .5
+            case 'Q':
+                return .25
+            case 'M':
+                return 1/12.0
+            case _:
+                raise RuntimeError(f'Invalid coupon frequency {self.value}')
+    
     def generate_schedule(self, start: Union[dtm.date, Tenor], end: Union[dtm.date, Tenor],
                           ref_date: dtm.date = None,
-                          adjust_type: BDayAdjustType = BDayAdjustType.NoAdjust) -> list[dtm.date]:
+                          bd_adjust: BDayAdjust = BDayAdjust(),
+                          extended: bool = False) -> list[dtm.date]:
         start_date = start if isinstance(start, dtm.date) else start.get_date(ref_date)
         end_date = end if isinstance(end, dtm.date) else end.get_date(start_date)
 
-        freq_tenor = self.to_tenor(backward=True)
-        schedule = []
-        date_i = end_date
-        while date_i > start_date:
-            date_i_adj = adjust_type.get_date(date_i)
-            schedule.insert(0, date_i_adj)
-            date_i = freq_tenor.get_date(date_i)
-        return schedule
+        return self.to_tenor(backward=True).generate_series(
+            start_date, end_date,
+            is_backward=True, bd_adjust=bd_adjust, extended=extended)
 
+
+def is_leap(year: int) -> bool:
+    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 class DayCount(StrEnum):
     
@@ -236,7 +252,7 @@ class DayCount(StrEnum):
                     from_date_to = dtm.date(from_date.year, to_date.month, to_date.day)
                     dcf = to_date.year-from_date.year
                 days_in_year = 365
-                if cal_lib.isleap(from_date.year):
+                if is_leap(from_date.year):
                     if from_date < dtm.date(from_date.year, 2, 29) <= from_date_to:
                         days_in_year += 1
                 dcf += (from_date_to-from_date).days / days_in_year
@@ -244,13 +260,13 @@ class DayCount(StrEnum):
             case 'ACTACTISDA':
                 if to_date.year > from_date.year:
                     from_date_to = dtm.date(from_date.year+1, 1, 1)
-                    dcf = (from_date_to-from_date).days / (365+cal_lib.isleap(from_date.year))
+                    dcf = (from_date_to-from_date).days / (365+is_leap(from_date.year))
                     dcf += to_date.year-from_date.year-1
                     to_date_from = dtm.date(to_date.year, 1, 1)
-                    dcf += (to_date-to_date_from).days / (365+cal_lib.isleap(to_date.year))
+                    dcf += (to_date-to_date_from).days / (365+is_leap(to_date.year))
                     return dcf
                 else:
-                    return (to_date-from_date).days / (365+cal_lib.isleap(to_date.year))
+                    return (to_date-from_date).days / (365+is_leap(to_date.year))
             case '30360':
                 from_day = 30 if from_date.day == 31 else from_date.day
                 to_day = 30 if to_date.day == 31 and from_date.day in (30, 31) else to_date.day
@@ -261,10 +277,21 @@ class DayCount(StrEnum):
                 return (to_date.year-from_date.year) + (to_date.month-from_date.month)/12 + (to_day-from_day)/360
             case _:
                 raise Exception(f'{self.value} not recognized for day count fraction')
+    
+    def get_unit_dcf(self) -> float:
+        match self.value:
+            case 'ACT360':
+                return 1/360.0
+            case 'ACT365':
+                return 1/365.0
+            case '30360' | '30E360':
+                return 1/360.0
+            case _:
+                raise Exception(f'{self.value} not recognized for day count fraction')
 
 # Return all business dates over a period
 def get_bdate_series(from_date: dtm.date, to_date: dtm.date, calendar: str = None) -> list[dtm.date]:
-    return Tenor.bday(1, calendar=calendar).generate_series(from_date, to_date)
+    return Tenor.bday(1, calendar=calendar).generate_series(from_date, to_date, inclusive=True)
 
 # Returns last valuation date
 def get_last_valuation_date(timezone: str = None, calendar: str = None,
