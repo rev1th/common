@@ -149,7 +149,7 @@ class Tenor():
     def generate_series(self, from_date: dtm.date, to_date: dtm.date,
                         is_backward: bool = False,
                         bd_adjust: BDayAdjust = BDayAdjust(),
-                        extended: bool = False, inclusive: bool = True,
+                        extended: bool = False, inclusive: bool = False,
                         ) -> list[dtm.date]:
         schedule = []
         if is_backward:
