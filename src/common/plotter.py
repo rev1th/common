@@ -7,10 +7,28 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-def add_traces(figure, data_struct, group: str = 'G1', mode: str = None, name: str = '',
+def add_traces(figure, data_struct,
+               y_col: str = None, text_col: str = None,
+               group: str = 'G1', mode: str = None, name: str = '',
                showlegend: bool = True, **kwargs):
     if isinstance(data_struct, pd.DataFrame):
         xvalues = list(data_struct.index)
+        if y_col and text_col:
+            figure.add_trace(
+                go.Scatter(
+                    x=xvalues,
+                    y=data_struct[y_col],
+                    customdata=data_struct[text_col],
+                    hovertemplate = text_col+': %{customdata}<br>(%{x}, %{y})',
+                    name=name+y_col,
+                    mode=mode,
+                    legendgroup=group,
+                    legendgrouptitle_text=group,
+                    showlegend=showlegend,
+                ),
+                **kwargs
+            )
+            return
         for col in data_struct.columns:
             figure.add_trace(
                 go.Scatter(
@@ -40,6 +58,7 @@ def add_traces(figure, data_struct, group: str = 'G1', mode: str = None, name: s
     elif isinstance(data_struct, dict):
         for k, v in data_struct.items():
             add_traces(figure, v, group=group, mode=mode, name=name+k,
+                       y_col=y_col, text_col=text_col,
                        showlegend=showlegend, **kwargs)
     else:
         raise Exception("Unrecognized datatype")
@@ -62,11 +81,13 @@ def get_figure(data, data2=None, title: str = 'Series',
                 x_name: str = 'Time', x_format: str = '%H:%M',
                 y_name: str = 'Price', y_format: str = None,
                 y2_name: str = 'Spread', y2_format: str = None,
+                y_col: str = None, text_col: str = None,
                 hovermode: str = None):
     if data2 is not None:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
-        add_traces(fig, data, group=y_name)
-        add_traces(fig, data2, group=y2_name, mode='lines', secondary_y=True)
+        add_traces(fig, data, group=y_name, y_col=y_col, text_col=text_col)
+        add_traces(fig, data2, group=y2_name, mode='lines',
+                   y_col=y_col, text_col=text_col, secondary_y=True)
     else:
         fig = go.Figure()
         add_traces(fig, data)
@@ -92,14 +113,16 @@ def plot_series(data, data2=None, title: str = 'Series',
                 x_name: str = 'Time', x_format: str = '%H:%M',
                 y_name: str = 'Price', y_format: str = None,
                 y2_name: str = 'Spread', y2_format: str = None,
+                text_col: str = None, y_col: str = None,
                 hovermode: str = None):
     get_figure(data, data2=data2, title=title,
                x_name=x_name, x_format=x_format,
                y_name=y_name, y_format=y_format,
                y2_name=y2_name, y2_format=y2_format,
+               text_col=text_col, y_col=y_col,
                hovermode=hovermode).show()
 
-def plot_series_multiple(data: dict, title: str = 'Multi plots',
+def plot_series_multiple(data: dict[str, any], title: str = 'Multi plots',
                          x_name: str = 'Time', x_format: str = '%H:%M',
                          y_name: str = 'Price', y_format: str = None) -> None:
     titles = list(sorted(data.keys()))
