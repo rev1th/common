@@ -24,44 +24,42 @@ def get_bdc(calendar: str):
         _CACHED_BDC[calendar] = np.busdaycalendar(holidays=hols)
     return _CACHED_BDC[calendar]
 
-def date_to_int(dt: dtm.date) -> int:
-    return (dt-FIRSTDATE).days
-
 def str_to_int(str_int: str) -> int:
     if str_int.isdigit() or (str_int[0] == '-' and str_int[1:].isdigit()):
         return int(str_int)
     return None
 
-def get_adjusted_date(adjust_type: str, date: dtm.date, calendar: str = None) -> dtm.date:
-    match adjust_type:
-        case 'F':
-            return (date + CBDay(0, calendar=get_bdc(calendar))).date()
-        case 'P':
-            bdc = get_bdc(calendar)
-            return (date + CBDay(1, calendar=bdc) + CBDay(-1, calendar=bdc)).date()
-        case 'MF':
-            date_f = get_adjusted_date('F', date, calendar)
-            # if EOM then preceding else following
-            if date_f.year > date.year or (date_f.year == date.year and date_f.month > date.month):
-                return get_adjusted_date('P', date, calendar)
-            return date_f
-        case _:
-            return date
 
 class BDayAdjustType(StrEnum):
-
     NoAdjust = ''
     Following = 'F'
     Previous = 'P'
     ModifiedFollowing = 'MF'
 
+def get_adjusted_date(adjust_type: BDayAdjustType, date: dtm.date, calendar: str = None) -> dtm.date:
+    match adjust_type:
+        case BDayAdjustType.Following:
+            return (date + CBDay(0, calendar=get_bdc(calendar))).date()
+        case BDayAdjustType.Previous:
+            bdc = get_bdc(calendar)
+            return (date + CBDay(1, calendar=bdc) + CBDay(-1, calendar=bdc)).date()
+        case BDayAdjustType.ModifiedFollowing:
+            date_f = get_adjusted_date(BDayAdjustType.Following, date, calendar)
+            # if EOM then preceding else following
+            if date_f.year > date.year or (date_f.year == date.year and date_f.month > date.month):
+                return get_adjusted_date(BDayAdjustType.Previous, date, calendar)
+            return date_f
+        case _:
+            return date
+
 @dataclass()
-class BDayAdjust():
-    _adjust_type: str = ''
-    _calendar: str = ''
+class BDayAdjust:
+    _adjust_type: BDayAdjustType = BDayAdjustType.NoAdjust
+    _calendar: str = None
 
     def get_date(self, date: dtm.date) -> dtm.date:
         return get_adjusted_date(self._adjust_type, date, self._calendar)
+
 
 def parseTenor(offsets: Union[str, tuple[str, str]]):
     if isinstance(offsets, str):
@@ -142,13 +140,13 @@ class Tenor():
             return res.date()
         return date + offset
     
-    def get_date(self, date: dtm.date = None, bd_adjust: BDayAdjust = BDayAdjust()) -> dtm.date:
+    def get_date(self, date: dtm.date = None, bd_adjust = BDayAdjust()) -> dtm.date:
         return bd_adjust.get_date(self._get_date(date))
     
     # Generates schedule with Tenor for [from_date, to_date]
     def generate_series(self, from_date: dtm.date, to_date: dtm.date,
                         is_backward: bool = False,
-                        bd_adjust: BDayAdjust = BDayAdjust(),
+                        bd_adjust = BDayAdjust(),
                         extended: bool = False, inclusive: bool = False,
                         ) -> list[dtm.date]:
         schedule = []
@@ -215,8 +213,8 @@ class Frequency(StrEnum):
     
     def generate_schedule(self, start: Union[dtm.date, Tenor], end: Union[dtm.date, Tenor],
                           ref_date: dtm.date = None,
-                          bd_adjust: BDayAdjust = BDayAdjust(),
-                          extended: bool = False) -> list[dtm.date]:
+                          bd_adjust = BDayAdjust(),
+                          extended = False) -> list[dtm.date]:
         start_date = start if isinstance(start, dtm.date) else start.get_date(ref_date)
         end_date = end if isinstance(end, dtm.date) else end.get_date(start_date)
 
@@ -298,7 +296,7 @@ def get_last_valuation_date(timezone: str = None, calendar: str = None,
                             roll_hour: int = 18, roll_minute: int = 0) -> dtm.date:
     sys_dtm = dtm.datetime.now()
     val_dtm = sys_dtm.astimezone(ZoneInfo(timezone) if timezone else None)
-    val_dt = get_adjusted_date('P', date=val_dtm.date(), calendar=calendar)
+    val_dt = get_adjusted_date(BDayAdjustType.Previous, val_dtm.date(), calendar=calendar)
     if val_dt < val_dtm.date():
         return val_dt
     if val_dtm.hour < roll_hour or (val_dtm.hour == roll_hour and val_dtm.minute < roll_minute):
@@ -310,7 +308,7 @@ def get_current_valuation_date(timezone: str = None, calendar: str = None,
                                roll_hour: int = 18, roll_minute: int = 0) -> dtm.date:
     sys_dtm = dtm.datetime.now()
     val_dtm = sys_dtm.astimezone(ZoneInfo(timezone) if timezone else None)
-    val_dt = get_adjusted_date('F', date=val_dtm.date(), calendar=calendar)
+    val_dt = get_adjusted_date(BDayAdjustType.Following, val_dtm.date(), calendar=calendar)
     if val_dt > val_dtm.date():
         return val_dt
     if val_dtm.hour > roll_hour or (val_dtm.hour == roll_hour and val_dtm.minute >= roll_minute):
