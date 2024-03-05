@@ -132,7 +132,7 @@ def plot_series_multiple(data: dict[str, any], title: str = 'Multi plots',
     fig = make_subplots(rows=nr, cols=nc, subplot_titles=titles)
     ni = 0
     for k in titles:
-        add_traces(fig, data[k], row=ni//nc+1, col=ni%nc+1)
+        add_traces(fig, data[k], group=k, row=ni//nc+1, col=ni%nc+1)
         # ax1 = axs[ni//ny, ni%ny]
         # ax1.set_title(k)
         ni += 1
