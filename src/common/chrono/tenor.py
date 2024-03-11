@@ -2,14 +2,13 @@
 from pydantic.dataclasses import dataclass
 from dataclasses import InitVar
 from typing import Union, Iterable
+from enum import StrEnum
 import datetime as dtm
 import holidays
 from zoneinfo import ZoneInfo
 import numpy as np
 from pandas.tseries.offsets import DateOffset, MonthEnd, QuarterEnd, YearEnd, MonthBegin, CustomBusinessDay as CBDay
-from enum import StrEnum
 
-FIRSTDATE = dtm.date(1900, 1, 1)
 _CACHED_BDC: dict[str, np.busdaycalendar] = {}
 _YEARS = range(2022, 2026)
 
@@ -97,7 +96,7 @@ def parseTenor(offsets: Union[str, tuple[str, str]]):
 
 
 @dataclass(config=dict(arbitrary_types_allowed = True))
-class Tenor():
+class Tenor:
     offset_init: InitVar[Union[str, tuple[str, str], DateOffset, Iterable[DateOffset], dtm.date]]
     
     def __post_init__(self, offset_init):
@@ -170,123 +169,6 @@ class Tenor():
                 schedule.append(date_i_adj)
         return schedule
 
-
-class Frequency(StrEnum):
-
-    Annual = 'A'
-    SemiAnnual = 'S'
-    Quarterly = 'Q'
-    Monthly = 'M'
-    Weekly = 'W'
-
-    def to_tenor(self, backward: bool = True) -> Tenor:
-        match self.value.upper():
-            case 'A':
-                return Tenor('-1y' if backward else '1y')
-            case 'S':
-                return Tenor('-6m' if backward else '6m')
-            case 'Q':
-                return Tenor('-3m' if backward else '3m')
-            case 'M':
-                return Tenor('-1m' if backward else '1m')
-            case 'W' | '7D':
-                return Tenor('-1w' if backward else '1w')
-            case '4W' | '28D':
-                return Tenor('-4w' if backward else '4w')
-            case 'D' | 'B':
-                return Tenor('-1b' if backward else '1b')
-            case _:
-                raise RuntimeError(f'Cannot parse frequency {self.value}')
-    
-    def get_unit_dcf(self) -> float:
-        match self.value.upper():
-            case 'A':
-                return 1.0
-            case 'S':
-                return .5
-            case 'Q':
-                return .25
-            case 'M':
-                return 1/12.0
-            case _:
-                raise RuntimeError(f'Invalid coupon frequency {self.value}')
-    
-    def generate_schedule(self, start: Union[dtm.date, Tenor], end: Union[dtm.date, Tenor],
-                          ref_date: dtm.date = None,
-                          bd_adjust = BDayAdjust(),
-                          roll_backward = True,
-                          extended = False) -> list[dtm.date]:
-        start_date = start if isinstance(start, dtm.date) else start.get_date(ref_date)
-        end_date = end if isinstance(end, dtm.date) else end.get_date(start_date)
-
-        return self.to_tenor(backward=roll_backward).generate_series(
-            start_date, end_date,
-            roll_backward=roll_backward, bd_adjust=bd_adjust, extended=extended)
-
-
-def is_leap(year: int) -> bool:
-    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
-
-class DayCount(StrEnum):
-    
-    ACT360 = 'ACT360'
-    ACT365 = 'ACT365'
-    ACTACT = 'ACTACT'
-    ACTACTISDA = 'ACTACTISDA'
-    _30360 = '30360'
-    _30E360 = '30E360'
-    # ACTACTISMA = 'ACTACTISMA'
-
-    def get_dcf(self, from_date: dtm.date, to_date: dtm.date) -> float:
-        match self.value:
-            case 'ACT360':
-                return (to_date-from_date).days/360.0
-            case 'ACT365':
-                return (to_date-from_date).days/365.0
-            case 'ACTACT':
-                if (from_date.month > to_date.month) or (from_date.month == to_date.month and from_date.day > to_date.day):
-                    from_date_to = dtm.date(from_date.year+1, to_date.month, to_date.day)
-                    dcf = to_date.year-from_date.year-1
-                else:
-                    from_date_to = dtm.date(from_date.year, to_date.month, to_date.day)
-                    dcf = to_date.year-from_date.year
-                days_in_year = 365
-                if is_leap(from_date.year):
-                    if from_date < dtm.date(from_date.year, 2, 29) <= from_date_to:
-                        days_in_year += 1
-                dcf += (from_date_to-from_date).days / days_in_year
-                return dcf
-            case 'ACTACTISDA':
-                if to_date.year > from_date.year:
-                    from_date_to = dtm.date(from_date.year+1, 1, 1)
-                    dcf = (from_date_to-from_date).days / (365+is_leap(from_date.year))
-                    dcf += to_date.year-from_date.year-1
-                    to_date_from = dtm.date(to_date.year, 1, 1)
-                    dcf += (to_date-to_date_from).days / (365+is_leap(to_date.year))
-                    return dcf
-                else:
-                    return (to_date-from_date).days / (365+is_leap(to_date.year))
-            case '30360':
-                from_day = 30 if from_date.day == 31 else from_date.day
-                to_day = 30 if to_date.day == 31 and from_date.day in (30, 31) else to_date.day
-                return (to_date.year-from_date.year) + (to_date.month-from_date.month)/12 + (to_day-from_day)/360
-            case '30E360':
-                from_day = 30 if from_date.day == 31 else from_date.day
-                to_day = 30 if to_date.day == 31 else to_date.day
-                return (to_date.year-from_date.year) + (to_date.month-from_date.month)/12 + (to_day-from_day)/360
-            case _:
-                raise Exception(f'{self.value} not recognized for day count fraction')
-    
-    def get_unit_dcf(self) -> float:
-        match self.value:
-            case 'ACT360':
-                return 1/360.0
-            case 'ACT365':
-                return 1/365.0
-            case '30360' | '30E360':
-                return 1/360.0
-            case _:
-                raise Exception(f'{self.value} not recognized for day count fraction')
 
 # Return all business dates over a period
 def get_bdate_series(from_date: dtm.date, to_date: dtm.date, calendar: str = None) -> list[dtm.date]:
