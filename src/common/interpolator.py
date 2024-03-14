@@ -94,19 +94,28 @@ class LogCubicSplineFree(Interpolator):
         return np.exp(interpolate.splev(x, self.spline_tck))
 
 
-# Natural Cubic spline with f''(x) = 0 at both ends. Standard for curve construction
+# Natural Cubic spline with f''(x) = 0 at both ends
 @dataclass
-class LogCubicSplineNatural(Interpolator):
-    log_ys: ClassVar[list[float]] = None
+class CubicSplineNatural(Interpolator):
 
     def __post_init__(self, xy_init):
         super().__post_init__(xy_init)
-        self.log_ys = [np.log(y) for y in self._ys]
         self.spline_tck = interpolate.make_interp_spline(
-                            self._xs, self.log_ys,
+                            self._xs, self._ys,
                             bc_type=([(2, 0.0)], [(2, 0.0)]))
 
     def get_value(self, x: float) -> float:
         super()._get_value(x)
-        return np.exp(interpolate.splev(x, self.spline_tck))
+        return interpolate.splev(x, self.spline_tck)
+
+# Standard for curve construction
+@dataclass
+class LogCubicSplineNatural(CubicSplineNatural):
+
+    def __post_init__(self, xy_init):
+        xly_init = [(x, np.log(y)) for x, y in xy_init]
+        super().__post_init__(xly_init)
+
+    def get_value(self, x: float) -> float:
+        return np.exp(super().get_value(x))
 
