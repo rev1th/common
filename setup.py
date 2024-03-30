@@ -14,5 +14,3 @@ setup(
     package_dir={"": "src"},
     install_requires=install_requires
 )
-
-# python setup.py bdist_wheel

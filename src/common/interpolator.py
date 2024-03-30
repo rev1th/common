@@ -8,7 +8,7 @@ import bisect
 
 
 @dataclass
-class Interpolator():
+class Interpolator:
     _xy_init: InitVar[list[tuple[float, float]]]
     _xs: ClassVar[list[float]]
     _ys: ClassVar[list[float]]
@@ -16,6 +16,9 @@ class Interpolator():
     def __post_init__(self, xy_init):
         self._xs, self._ys = zip(*xy_init)
 
+    def update(self, xy_init):
+        self.__post_init__(xy_init)
+    
     @property
     def size(self):
         return len(self._xs)
@@ -43,40 +46,37 @@ class Interpolator():
 @dataclass
 class Step(Interpolator):
 
-    def __post_init__(self, xy_init):
-        super().__post_init__(xy_init)
-    
     def get_value(self, x: float) -> float:
         super()._get_value(x)
-
-        if x in self._xs:
-            return self._ys[self._xs.index(x)]
-        ih = bisect.bisect_left(self._xs, x)
+        ih = bisect.bisect(self._xs, x)
         return self._ys[ih-1]
 
 
 @dataclass
-class LogLinear(Interpolator):
-    log_ys: ClassVar[list[float]] = None
-
-    def __post_init__(self, xy_init):
-        self.update(xy_init)
-
-    def update(self, xy_init):
-        super().__post_init__(xy_init)
-        self.log_ys = [np.log(y) for y in self._ys]
+class Linear(Interpolator):
     
     def get_value(self, x: float) -> float:
         super()._get_value(x)
 
-        if x in self._xs:
-            return self._ys[self._xs.index(x)]
-        elif x > self._xs[-1]:
-            slope = (self.log_ys[-1] - self.log_ys[-2]) / (self._xs[-1] - self._xs[-2])
-            return self._ys[-1] * np.exp((x-self._xs[-1]) * slope)
+        if x > self._xs[-1]:
+            slope = (self._ys[-1] - self._ys[-2]) / (self._xs[-1] - self._xs[-2])
+            return self._ys[-1] + slope * (x-self._xs[-1])
         ih = bisect.bisect_left(self._xs, x)
-        slope = (self.log_ys[ih] - self.log_ys[ih-1]) / (self._xs[ih] - self._xs[ih-1])
-        return self._ys[ih-1] * np.exp((x - self._xs[ih-1]) * slope)
+        if x == self._xs[ih]:
+            return self._ys[ih]
+        slope = (self._ys[ih] - self._ys[ih-1]) / (self._xs[ih] - self._xs[ih-1])
+        return self._ys[ih-1] + slope * (x - self._xs[ih-1])
+
+
+@dataclass
+class LogLinear(Linear):
+
+    def __post_init__(self, xy_init):
+        xly_init = [(x, np.log(y)) for x, y in xy_init]
+        super().__post_init__(xly_init)
+    
+    def get_value(self, x: float) -> float:
+        return np.exp(super().get_value(x))
 
 
 # Cubic spline with free ends
