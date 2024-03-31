@@ -1,27 +1,14 @@
 
 from pydantic.dataclasses import dataclass
 from dataclasses import InitVar
-from typing import Union, Iterable
+from typing import Union, Iterable, Optional
 from enum import StrEnum
 import datetime as dtm
-import holidays
 from zoneinfo import ZoneInfo
-import numpy as np
 from pandas.tseries.offsets import DateOffset, MonthEnd, QuarterEnd, YearEnd, MonthBegin, CustomBusinessDay as CBDay
 
-_CACHED_BDC: dict[str, np.busdaycalendar] = {}
-_YEARS = range(2022, 2026)
+from .calendar import get_bdc, Calendar
 
-
-def get_bdc(calendar: str):
-    if calendar not in _CACHED_BDC:
-        subcals = calendar.split('-')
-        if len(subcals) > 1:
-            hols = list(holidays.country_holidays(subcals[0], subdiv=subcals[1], years = _YEARS).keys())
-        else:
-            hols = list(holidays.country_holidays(subcals[0][:2], years = _YEARS).keys())
-        _CACHED_BDC[calendar] = np.busdaycalendar(holidays=hols)
-    return _CACHED_BDC[calendar]
 
 def str_to_int(str_int: str) -> int:
     if str_int.isdigit() or (str_int[0] == '-' and str_int[1:].isdigit()):
@@ -30,12 +17,11 @@ def str_to_int(str_int: str) -> int:
 
 
 class BDayAdjustType(StrEnum):
-    NoAdjust = ''
     Following = 'F'
     Previous = 'P'
     ModifiedFollowing = 'MF'
 
-def get_adjusted_date(adjust_type: BDayAdjustType, date: dtm.date, calendar: str = None) -> dtm.date:
+def get_adjusted_date(adjust_type: Optional[BDayAdjustType], date: dtm.date, calendar: Optional[Calendar]) -> dtm.date:
     match adjust_type:
         case BDayAdjustType.Following:
             return (date + CBDay(0, calendar=get_bdc(calendar))).date()
@@ -53,8 +39,8 @@ def get_adjusted_date(adjust_type: BDayAdjustType, date: dtm.date, calendar: str
 
 @dataclass()
 class BDayAdjust:
-    _adjust_type: BDayAdjustType = BDayAdjustType.NoAdjust
-    _calendar: str = None
+    _adjust_type: Optional[BDayAdjustType] = None
+    _calendar: Optional[Calendar] = None
 
     def get_date(self, date: dtm.date) -> dtm.date:
         return get_adjusted_date(self._adjust_type, date, self._calendar)
@@ -114,8 +100,8 @@ class Tenor:
         return Tenor(offsets)
     
     @classmethod
-    def bday(cls, n: int = 0, calendar: str = None):
-        return cls(CBDay(n=n, calendar=(get_bdc(calendar) if calendar else None)))
+    def bday(cls, n: int = 0, calendar: Union[Calendar, str] = None):
+        return cls(CBDay(n=n, calendar=get_bdc(calendar)))
     
     @property
     def is_backward(self) -> dtm.date:
@@ -171,7 +157,7 @@ class Tenor:
 
 
 # Return all business dates over a period
-def get_bdate_series(from_date: dtm.date, to_date: dtm.date, calendar: str = None) -> list[dtm.date]:
+def get_bdate_series(from_date: dtm.date, to_date: dtm.date, calendar: Union[Calendar, str] = None) -> list[dtm.date]:
     return Tenor.bday(1, calendar=calendar).generate_series(from_date, to_date, inclusive=True)
 
 # Returns last valuation date
