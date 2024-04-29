@@ -9,10 +9,11 @@ from plotly.subplots import make_subplots
 
 def add_traces(figure, data_struct,
                text_col: str = None,
-               group: str = 'G1', mode: str = None, name: str = '',
+               group: str = None, mode: str = None, name: str = '',
                showlegend: bool = True, **kwargs):
     if isinstance(data_struct, pd.DataFrame):
         xvalues = list(data_struct.index)
+        col_id = 0
         for col in data_struct.columns:
             if col == text_col:
                 continue
@@ -23,7 +24,7 @@ def add_traces(figure, data_struct,
                     customdata=data_struct[text_col],
                     hovertemplate = text_col+': %{customdata}<br>(%{x}, %{y})',
                     name=name+col,
-                    mode=mode,
+                    mode=mode[col_id] if isinstance(mode, list) else mode,
                     legendgroup=group,
                     legendgrouptitle_text=group,
                     showlegend=showlegend,
@@ -40,6 +41,7 @@ def add_traces(figure, data_struct,
                 ),
                 **kwargs
             )
+            col_id += 1
     elif isinstance(data_struct, pd.Series):
         figure.add_trace(
             go.Scatter(
@@ -79,15 +81,15 @@ def get_figure(data, data2=None, title: str = 'Series',
                 x_name: str = 'Time', x_format: str = '%H:%M',
                 y_name: str = 'Price', y_format: str = None,
                 y2_name: str = 'Spread', y2_format: str = None,
-                text_col: str = None,
+                text_col: str = None, mode: str = None, mode2: str = None,
                 hovermode: str = None):
     if data2 is not None:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
-        add_traces(fig, data, group=y_name, text_col=text_col)
-        add_traces(fig, data2, group=y2_name, mode='lines', text_col=text_col, secondary_y=True)
+        add_traces(fig, data, mode=mode, text_col=text_col)
+        add_traces(fig, data2, group=y2_name, mode=mode2, text_col=text_col, secondary_y=True)
     else:
         fig = go.Figure()
-        add_traces(fig, data, text_col=text_col)
+        add_traces(fig, data, mode=mode, text_col=text_col)
     fig.update_layout(
         title_text=title,
         xaxis=dict(
@@ -103,6 +105,7 @@ def get_figure(data, data2=None, title: str = 'Series',
             tickformat=y2_format,
         ),
         hovermode=hovermode,
+        legend=dict(groupclick='toggleitem'),# itemdoubleclick='toggleothers'),
     )
     return fig
 

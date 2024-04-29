@@ -7,6 +7,15 @@ import numpy as np
 from .tenor import Tenor, BDayAdjust
 
 
+_UNIT_DCF = {
+    'A': 1.0,
+    'S': .5,
+    'Q': .25,
+    'M': 1/12.0,
+    '4W': 1/13.0,
+    'W': 1/52.0,
+}
+
 class Frequency(StrEnum):
 
     Annual = 'A'
@@ -35,17 +44,10 @@ class Frequency(StrEnum):
                 raise RuntimeError(f'Cannot parse frequency {self.value}')
     
     def get_unit_dcf(self) -> float:
-        match self.value:
-            case 'A':
-                return 1.0
-            case 'S':
-                return .5
-            case 'Q':
-                return .25
-            case 'M':
-                return 1/12.0
-            case _:
-                raise RuntimeError(f'Invalid coupon frequency {self.value}')
+        try:
+            return _UNIT_DCF[self.value]
+        except KeyError:
+            raise RuntimeError(f'Invalid coupon frequency {self.value}')
     
     def generate_schedule(self, start: Union[dtm.date, Tenor], end: Union[dtm.date, Tenor],
                           ref_date: dtm.date = None,
@@ -79,7 +81,7 @@ class Compounding(StrEnum):
             case 'D':
                 return (df ** (-dcf_unit / dcf) - 1) / dcf_unit
             case 'A' | 'S' | 'Q' | 'M':
-                dcf_compound = Frequency(self.value).get_unit_dcf()
+                dcf_compound = _UNIT_DCF[self.value]
                 return (df ** (-dcf_compound / dcf) - 1) / dcf_compound
             case _:
                 raise RuntimeError(f'Cannot parse compounding {self.value}')
@@ -91,7 +93,7 @@ class Compounding(StrEnum):
             case 'SIM':
                 return 1 / (1 + rate * dcf)
             case 'A' | 'S' | 'Q' | 'M':
-                dcf_compound = Frequency(self.value).get_unit_dcf()
+                dcf_compound = _UNIT_DCF[self.value]
                 return (1 + rate * dcf_compound) ** (-dcf / dcf_compound)
             case _:
                 raise RuntimeError(f'Cannot parse compounding {self.value}')
