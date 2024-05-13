@@ -1,6 +1,6 @@
 
 from pydantic.dataclasses import dataclass
-from dataclasses import InitVar
+from dataclasses import InitVar, field
 from typing import ClassVar
 import numpy as np
 from scipy import interpolate
@@ -12,6 +12,7 @@ class Interpolator:
     _xy_init: InitVar[list[tuple[float, float]]]
     _xs: ClassVar[list[float]]
     _ys: ClassVar[list[float]]
+    _extrapolate_left: bool = field(kw_only=True, default=False)
 
     def __post_init__(self, xy_init):
         self._xs, self._ys = zip(*xy_init)
@@ -37,7 +38,8 @@ class Interpolator:
             raise Exception(f"{type} not supported yet")
 
     def _get_value(self, x: float):
-        assert x >= self._xs[0], f"Cannot interpolate {x} before start {self._xs[0]}"
+        if not self._extrapolate_left:
+            assert x >= self._xs[0], f"Cannot interpolate {x} before start {self._xs[0]}"
 
     def get_value(self, _: float):
         raise Exception("Abstract function")

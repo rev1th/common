@@ -82,7 +82,7 @@ def get_figure(data, data2=None, title: str = 'Series',
                 y_name: str = 'Price', y_format: str = None,
                 y2_name: str = 'Spread', y2_format: str = None,
                 text_col: str = None, mode: str = None, mode2: str = None,
-                hovermode: str = None):
+                hovermode: str = None, legend: dict = None):
     if data2 is not None:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         add_traces(fig, data, mode=mode, text_col=text_col)
@@ -105,7 +105,8 @@ def get_figure(data, data2=None, title: str = 'Series',
             tickformat=y2_format,
         ),
         hovermode=hovermode,
-        legend=dict(groupclick='toggleitem'),# itemdoubleclick='toggleothers'),
+        legend=legend,
+        # dict(groupclick='toggleitem', itemdoubleclick='toggleothers')
     )
     return fig
 
@@ -149,9 +150,10 @@ def plot_series_multiple(data: dict[str, any], title: str = 'Multi plots',
     )
     fig.show()
 
-def plot_series_3d(data: pd.DataFrame, data2 = None, title: str = 'Vol Surface',
-                   x_id: int = 0, x_format: str = '%d-%b-%Y',
-                   y_id: int = 1, z_id: int = 2, z_format: str = ',.2%') -> None:
+def get_figure_3d(data: pd.DataFrame, data2: pd.DataFrame = None, title: str = 'Series 3D',
+                  data_name: str = 'Nodes', data2_name: str = 'Extra',
+                  x_id: int = 0, x_format: str = '%d-%b-%Y',
+                  y_id: int = 1, z_id: int = 2, z_format: str = ',.2%') -> None:
     fig = go.Figure()
     data_cols = data.columns
     fig.add_trace(go.Mesh3d(
@@ -161,7 +163,7 @@ def plot_series_3d(data: pd.DataFrame, data2 = None, title: str = 'Vol Surface',
         z=list(data[data_cols[z_id]]),
     ))
     fig.add_trace(go.Scatter3d(
-        name='Nodes',
+        name=data_name,
         x=list(data[data_cols[x_id]]),
         y=list(data[data_cols[y_id]]),
         z=list(data[data_cols[z_id]]),
@@ -169,7 +171,7 @@ def plot_series_3d(data: pd.DataFrame, data2 = None, title: str = 'Vol Surface',
     ))
     if data2 is not None:
         fig.add_trace(go.Scatter3d(
-            name='Extra',
+            name=data2_name,
             x=list(data2[data_cols[x_id]]),
             y=list(data2[data_cols[y_id]]),
             z=list(data2[data_cols[z_id]]),
@@ -195,4 +197,11 @@ def plot_series_3d(data: pd.DataFrame, data2 = None, title: str = 'Vol Surface',
             ),
         ),
     )
-    fig.show()
+    return fig
+
+def plot_series_3d(data: pd.DataFrame, data2 = None, title: str = 'Series 3D',
+                   x_id: int = 0, x_format: str = '%d-%b-%Y',
+                   y_id: int = 1, z_id: int = 2, z_format: str = ',.2%') -> None:
+    get_figure(data, data2=data2, title=title,
+               x_id=x_id, x_format=x_format,
+               y_id=y_id, z_id=z_id, z_format=z_format).show()
