@@ -82,7 +82,7 @@ def get_figure(data, data2=None, title: str = 'Series',
                 y_name: str = 'Price', y_format: str = None,
                 y2_name: str = 'Spread', y2_format: str = None,
                 text_col: str = None, mode: str = None, mode2: str = None,
-                hovermode: str = None):
+                hovermode: str = None, legend: dict = None):
     if data2 is not None:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         add_traces(fig, data, mode=mode, text_col=text_col)
@@ -105,7 +105,8 @@ def get_figure(data, data2=None, title: str = 'Series',
             tickformat=y2_format,
         ),
         hovermode=hovermode,
-        legend=dict(groupclick='toggleitem'),# itemdoubleclick='toggleothers'),
+        legend=legend,
+        # dict(groupclick='toggleitem', itemdoubleclick='toggleothers')
     )
     return fig
 

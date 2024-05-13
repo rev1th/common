@@ -1,6 +1,5 @@
 
 from pydantic.dataclasses import dataclass
-from dataclasses import InitVar
 from typing import Union, Iterable, Optional
 from enum import StrEnum
 import datetime as dtm
@@ -21,7 +20,8 @@ class BDayAdjustType(StrEnum):
     Previous = 'P'
     ModifiedFollowing = 'MF'
 
-def get_adjusted_date(adjust_type: Optional[BDayAdjustType], date: dtm.date, calendar: Optional[Calendar]) -> dtm.date:
+def get_adjusted_date(adjust_type: Optional[BDayAdjustType], date: dtm.date,
+                        calendar: Optional[Calendar] = None) -> dtm.date:
     match adjust_type:
         case BDayAdjustType.Following:
             return (date + CBDay(0, calendar=get_bdc(calendar))).date()
@@ -37,7 +37,7 @@ def get_adjusted_date(adjust_type: Optional[BDayAdjustType], date: dtm.date, cal
         case _:
             return date
 
-@dataclass()
+@dataclass
 class BDayAdjust:
     _adjust_type: Optional[BDayAdjustType] = None
     _calendar: Optional[Calendar] = None
@@ -46,7 +46,7 @@ class BDayAdjust:
         return get_adjusted_date(self._adjust_type, date, self._calendar)
 
 
-def parseTenor(offsets: Union[str, tuple[str, str]]):
+def parseTenor(offsets: Union[str, tuple[str, str]]) -> DateOffset:
     if isinstance(offsets, str):
         offset, bdc = offsets, None
     else:
@@ -83,13 +83,13 @@ def parseTenor(offsets: Union[str, tuple[str, str]]):
 
 @dataclass(config=dict(arbitrary_types_allowed = True))
 class Tenor:
-    offset_init: InitVar[Union[str, tuple[str, str], DateOffset, Iterable[DateOffset], dtm.date]]
+    _code: Union[str, tuple[str, Optional[str]], DateOffset]
     
-    def __post_init__(self, offset_init):
-        if isinstance(offset_init, str) or isinstance(offset_init, tuple):
-            self._offset = parseTenor(offset_init)
+    def __post_init__(self):
+        if isinstance(self._code, str) or isinstance(self._code, tuple):
+            self._offset = parseTenor(self._code)
         else:
-            self._offset = offset_init
+            self._offset = self._code
     
     def __add__(self, new):
         offsets = self._offset if isinstance(self._offset, Iterable) else [self._offset]
@@ -114,9 +114,7 @@ class Tenor:
     
     def _get_date(self, date: dtm.date = None) -> dtm.date:
         offset = self._offset
-        if isinstance(offset, dtm.date):
-            return offset
-        elif isinstance(offset, DateOffset):
+        if isinstance(offset, DateOffset):
             return (date + offset).date()
         elif isinstance(offset, Iterable):
             res = date
@@ -139,17 +137,30 @@ class Tenor:
             date_i = to_date
             while date_i > from_date:
                 date_i_adj = bd_adjust.get_date(date_i)
-                schedule.insert(0, date_i_adj)
-                date_i = self.get_date(date_i)
+                # ensure still within period after adjustment
+                if date_i_adj > from_date:
+                    schedule.append(date_i_adj)
+                    date_i = self.get_date(date_i)
+                    # move prior to adjusted
+                    while date_i >= date_i_adj:
+                        date_i = self.get_date(date_i)
+                else:
+                    break
             if (inclusive and date_i == from_date) or extended:
                 date_i_adj = bd_adjust.get_date(date_i)
-                schedule.insert(0, date_i_adj)
+                schedule.append(date_i_adj)
+            schedule.reverse()
         else:
             date_i = from_date
             while date_i < to_date:
                 date_i_adj = bd_adjust.get_date(date_i)
-                schedule.append(date_i_adj)
-                date_i = self.get_date(date_i)
+                if date_i_adj < to_date:
+                    schedule.append(date_i_adj)
+                    date_i = self.get_date(date_i)
+                    while date_i <= date_i_adj:
+                        date_i = self.get_date(date_i)
+                else:
+                    break
             if (inclusive and date_i == to_date) or extended:
                 date_i_adj = bd_adjust.get_date(date_i)
                 schedule.append(date_i_adj)
@@ -158,10 +169,11 @@ class Tenor:
 
 # Return all business dates over a period
 def get_bdate_series(from_date: dtm.date, to_date: dtm.date, calendar: Union[Calendar, str] = None) -> list[dtm.date]:
-    return Tenor.bday(1, calendar=calendar).generate_series(from_date, to_date, inclusive=True)
+    from_date_adj = get_adjusted_date(BDayAdjustType.Following, from_date, calendar=calendar)
+    return Tenor.bday(1, calendar=calendar).generate_series(from_date_adj, to_date, inclusive=True)
 
-# Returns last valuation date
-def get_last_valuation_date(timezone: str = None, calendar: str = None,
+# Returns last business date
+def get_last_valuation_date(timezone: str = None, calendar: Union[Calendar, str] = None,
                             roll_hour: int = 18, roll_minute: int = 0) -> dtm.date:
     sys_dtm = dtm.datetime.now()
     val_dtm = sys_dtm.astimezone(ZoneInfo(timezone) if timezone else None)
@@ -172,8 +184,8 @@ def get_last_valuation_date(timezone: str = None, calendar: str = None,
         return Tenor(('-1B', calendar)).get_date(val_dt)
     return val_dtm.date()
 
-# Returns current valuation date, roll forward on holiday
-def get_current_valuation_date(timezone: str = None, calendar: str = None,
+# Returns current business date rolling forward on holiday
+def get_current_valuation_date(timezone: str = None, calendar: Union[Calendar, str] = None,
                                roll_hour: int = 18, roll_minute: int = 0) -> dtm.date:
     sys_dtm = dtm.datetime.now()
     val_dtm = sys_dtm.astimezone(ZoneInfo(timezone) if timezone else None)
