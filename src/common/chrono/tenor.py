@@ -1,12 +1,13 @@
 
 from pydantic.dataclasses import dataclass
 from typing import Union, Iterable, Optional
-from enum import StrEnum
 import datetime as dtm
 from zoneinfo import ZoneInfo
 from pandas.tseries.offsets import DateOffset, MonthEnd, QuarterEnd, YearEnd, MonthBegin, CustomBusinessDay as CBDay
 
 from .calendar import get_bdc, Calendar
+from .badjust import BDayAdjust, BDayAdjustType, get_adjusted_date
+from .roll import RollConvention
 
 
 def str_to_int(str_int: str) -> int:
@@ -14,37 +15,9 @@ def str_to_int(str_int: str) -> int:
         return int(str_int)
     return None
 
-
-class BDayAdjustType(StrEnum):
-    Following = 'F'
-    Previous = 'P'
-    ModifiedFollowing = 'MF'
-
-def get_adjusted_date(adjust_type: Optional[BDayAdjustType], date: dtm.date,
-                        calendar: Optional[Calendar] = None) -> dtm.date:
-    match adjust_type:
-        case BDayAdjustType.Following:
-            return (date + CBDay(0, calendar=get_bdc(calendar))).date()
-        case BDayAdjustType.Previous:
-            bdc = get_bdc(calendar)
-            return (date + CBDay(1, calendar=bdc) + CBDay(-1, calendar=bdc)).date()
-        case BDayAdjustType.ModifiedFollowing:
-            date_f = get_adjusted_date(BDayAdjustType.Following, date, calendar)
-            # if EOM then preceding else following
-            if date_f.year > date.year or (date_f.year == date.year and date_f.month > date.month):
-                return get_adjusted_date(BDayAdjustType.Previous, date, calendar)
-            return date_f
-        case _:
-            return date
-
-@dataclass
-class BDayAdjust:
-    _adjust_type: Optional[BDayAdjustType] = None
-    _calendar: Optional[Calendar] = None
-
-    def get_date(self, date: dtm.date) -> dtm.date:
-        return get_adjusted_date(self._adjust_type, date, self._calendar)
-
+def is_eom(date: dtm.date):
+    next_day = date + dtm.timedelta(days=1)
+    return next_day.month != date.month
 
 def parseTenor(offsets: Union[str, tuple[str, str]]) -> DateOffset:
     if isinstance(offsets, str):
@@ -128,15 +101,19 @@ class Tenor:
     
     # Generates schedule with Tenor for [from_date, to_date]
     def generate_series(self, from_date: dtm.date, to_date: dtm.date,
-                        roll_backward: bool = False,
+                        step_backward: bool = False,
                         bd_adjust = BDayAdjust(),
+                        roll_convention = RollConvention(),
                         extended: bool = False, inclusive: bool = False,
                         ) -> list[dtm.date]:
         schedule = []
-        if roll_backward:
+        if step_backward:
+            if roll_convention.is_eom():
+                if not is_eom(to_date):
+                    roll_convention = RollConvention()
             date_i = to_date
             while date_i > from_date:
-                date_i_adj = bd_adjust.get_date(date_i)
+                date_i_adj = bd_adjust.get_date(roll_convention.get_date(date_i))
                 # ensure still within period after adjustment
                 if date_i_adj > from_date:
                     schedule.append(date_i_adj)
@@ -147,13 +124,13 @@ class Tenor:
                 else:
                     break
             if (inclusive and date_i == from_date) or extended:
-                date_i_adj = bd_adjust.get_date(date_i)
+                date_i_adj = bd_adjust.get_date(roll_convention.get_date(date_i))
                 schedule.append(date_i_adj)
             schedule.reverse()
         else:
             date_i = from_date
             while date_i < to_date:
-                date_i_adj = bd_adjust.get_date(date_i)
+                date_i_adj = bd_adjust.get_date(roll_convention.get_date(date_i))
                 if date_i_adj < to_date:
                     schedule.append(date_i_adj)
                     date_i = self.get_date(date_i)
@@ -162,7 +139,7 @@ class Tenor:
                 else:
                     break
             if (inclusive and date_i == to_date) or extended:
-                date_i_adj = bd_adjust.get_date(date_i)
+                date_i_adj = bd_adjust.get_date(roll_convention.get_date(date_i))
                 schedule.append(date_i_adj)
         return schedule
 

@@ -5,7 +5,7 @@ import datetime as dtm
 import numpy as np
 
 from .tenor import Tenor, BDayAdjust
-
+from .roll import RollConvention
 
 _UNIT_DCF = {
     'A': 1.0,
@@ -52,14 +52,15 @@ class Frequency(StrEnum):
     def generate_schedule(self, start: Union[dtm.date, Tenor], end: Union[dtm.date, Tenor],
                           ref_date: dtm.date = None,
                           bd_adjust = BDayAdjust(),
-                          roll_backward = True,
+                          roll_convention = RollConvention(),
+                          step_backward = True,
                           extended = False) -> list[dtm.date]:
         start_date = start if isinstance(start, dtm.date) else start.get_date(ref_date)
         end_date = end if isinstance(end, dtm.date) else end.get_date(start_date)
 
-        return self.to_tenor(backward=roll_backward).generate_series(
-            start_date, end_date,
-            roll_backward=roll_backward, bd_adjust=bd_adjust, extended=extended)
+        return self.to_tenor(backward=step_backward).generate_series(
+            start_date, end_date, roll_convention=roll_convention,
+            step_backward=step_backward, bd_adjust=bd_adjust, extended=extended)
 
 
 class Compounding(StrEnum):
