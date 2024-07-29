@@ -21,3 +21,5 @@ class NameDateClass(NameClass):
     # def date(self) -> dtm.date:
     #     return self._date
 
+    def display_name(self) -> str:
+        return f"{self.name}:{self.date.strftime('%d-%b')}"

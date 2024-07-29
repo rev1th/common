@@ -5,3 +5,4 @@ pydantic
 holidays
 pandas
 plotly
+sortedcontainers==2.4.*

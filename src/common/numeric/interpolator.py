@@ -10,9 +10,10 @@ import bisect
 @dataclass
 class Interpolator:
     _xy_init: InitVar[list[tuple[float, float]]]
+    _extrapolate_left: bool = field(kw_only=True, default=False)
+    
     _xs: ClassVar[list[float]]
     _ys: ClassVar[list[float]]
-    _extrapolate_left: bool = field(kw_only=True, default=False)
 
     def __post_init__(self, xy_init):
         self._xs, self._ys = zip(*xy_init)

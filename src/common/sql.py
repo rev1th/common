@@ -7,7 +7,7 @@ logger = logging.Logger(__name__)
 DATE_FORMAT = '%Y-%m-%d'
 
 def fetch(query: str, filename: str, count: int = 0):
-    connect = sqlite3.connect(f'data/{filename}')
+    connect = sqlite3.connect(filename)
     cursor = connect.cursor()
     try:
         exec_obj = cursor.execute(query)
@@ -23,7 +23,7 @@ def fetch(query: str, filename: str, count: int = 0):
     return res
 
 def modify(query: str, filename: str) -> bool:
-    connect = sqlite3.connect(f'data/{filename}')
+    connect = sqlite3.connect(filename)
     cursor = connect.cursor()
     try:
         logger.error(f'modifying {filename}: {query}')

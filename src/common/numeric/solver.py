@@ -35,16 +35,26 @@ def find_root(error_f, args: tuple[any] = (), bracket: tuple[float] = None, init
         raise Exception(f"Failed to converge after {solver.iterations} iterations due to {solver.flag}")
     return solver.root
 
-def find_fit(cost_f, init_guess: list[float], jacobian=None, **kwargs) -> list[float]:
+# good: Nelder-Mead, Powell, trust-constr
+# unbounded: CG (conjugate gradient), BFGS, L-BFGS-B, TNC (truncated Newton), 
+# unreliable: COBYLA (Constrained Linear), SLSQP (Sequential Least Squares)
+# Jacobian required: Newton-CG, dogleg, trust-ncg, trust-exact, trust-krylov
+def find_fit(cost_f, init_guess: list[float],
+             args: tuple[any] = (), method: str = None,
+             jacobian=None,
+             bounds=None, **kwargs) -> list[float]:
     start = time.time()
+    if method is None and jacobian is None and bounds:
+        method='Nelder-Mead'
     solver = optimize.minimize(
-            fun=cost_f,
-            x0=init_guess,
-            jac=jacobian,
-            **kwargs
-        )
+                fun=cost_f, x0=init_guess,
+                args=args, method=method,
+                jac=jacobian,
+                bounds=bounds,
+                **kwargs)
     end = time.time()
-    logger.error(f"Optimization iter: {solver.nit}, fev: {solver.nfev}, jev: {solver.njev}, time: {end-start}")
+    logger.error(f"Optimization time: {end-start}, iter: {solver.get('nit', None)}, "\
+                 f"fev: {solver.get('nfev', None)}, jev: {solver.get('njev', None)}")
     if not solver.success:
         logger.error(f"Failed to minimize: {solver.message}")
     return solver.x

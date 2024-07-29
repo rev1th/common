@@ -1,17 +1,18 @@
-
 from pydantic.dataclasses import dataclass
+from dataclasses import field
 import datetime as dtm
+from typing import Self
 
-from common.models.base_instrument import BaseInstrumentP
+from common.models.base_instrument import BaseInstrument
 
 @dataclass
-class Future(BaseInstrumentP):
-    _underlying: BaseInstrumentP
+class Future(BaseInstrument):
+    _underlying: BaseInstrument
     _expiry: dtm.date
-    _settle: dtm.date
+    _lot_size: int = field(kw_only=True, default=1)
     
     @property
-    def underlying(self) -> str:
+    def underlying(self):
         return self._underlying
     
     @property
@@ -19,9 +20,8 @@ class Future(BaseInstrumentP):
         return self._expiry
     
     @property
-    def settle_date(self):
-        return self._settle
+    def lot_size(self):
+        return self._lot_size
     
-    def set_market(self, date: dtm.date, price: float) -> None:
-        assert date <= self.expiry, "Value date cannot be after expiry"
-        super().set_market(date, price)
+    def __lt__(self, other: Self) -> bool:
+        return self._expiry < other._expiry

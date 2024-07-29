@@ -153,7 +153,7 @@ def plot_series_multiple(data: dict[str, any], title: str = 'Multi plots',
 def get_figure_3d(data: pd.DataFrame, data2: pd.DataFrame = None, title: str = 'Series 3D',
                   data_name: str = 'Nodes', data2_name: str = 'Extra',
                   x_id: int = 0, x_format: str = '%d-%b-%Y',
-                  y_id: int = 1, z_id: int = 2, z_format: str = ',.2%') -> None:
+                  y_id: int = 1, z_id: int = 2, z_format: str = ',.3%') -> None:
     fig = go.Figure()
     data_cols = data.columns
     fig.add_trace(go.Mesh3d(
