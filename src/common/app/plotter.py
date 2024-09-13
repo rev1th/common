@@ -1,4 +1,3 @@
-
 import pandas as pd
 # import matplotlib.pyplot as plt
 # import matplotlib.dates as mdates
@@ -150,33 +149,29 @@ def plot_series_multiple(data: dict[str, any], title: str = 'Multi plots',
     )
     fig.show()
 
-def get_figure_3d(data: pd.DataFrame, data2: pd.DataFrame = None, title: str = 'Series 3D',
-                  data_name: str = 'Nodes', data2_name: str = 'Extra',
+def get_figure_3d(data: pd.DataFrame, title: str = 'Series 3D',
                   x_id: int = 0, x_format: str = '%d-%b-%Y',
-                  y_id: int = 1, z_id: int = 2, z_format: str = ',.3%') -> None:
+                  y_id: int = 1, y_format: str = None, z_name: str = 'Value',
+                  z_format: str = ',.3%', mesh_ids: list[int] = [2]):
     fig = go.Figure()
     data_cols = data.columns
-    fig.add_trace(go.Mesh3d(
-        name='Mesh',
-        x=list(data[data_cols[x_id]]),
-        y=list(data[data_cols[y_id]]),
-        z=list(data[data_cols[z_id]]),
-    ))
-    fig.add_trace(go.Scatter3d(
-        name=data_name,
-        x=list(data[data_cols[x_id]]),
-        y=list(data[data_cols[y_id]]),
-        z=list(data[data_cols[z_id]]),
-        mode='markers',
-    ))
-    if data2 is not None:
+    for z_id in range(len(data_cols)):
+        if z_id == x_id or z_id == y_id:
+            continue
         fig.add_trace(go.Scatter3d(
-            name=data2_name,
-            x=list(data2[data_cols[x_id]]),
-            y=list(data2[data_cols[y_id]]),
-            z=list(data2[data_cols[z_id]]),
+            name=data_cols[z_id],
+            x=list(data[data_cols[x_id]]),
+            y=list(data[data_cols[y_id]]),
+            z=list(data[data_cols[z_id]]),
             mode='markers',
         ))
+        if z_id in mesh_ids:
+            fig.add_trace(go.Mesh3d(
+                name=f'{data_cols[z_id]}-Mesh',
+                x=list(data[data_cols[x_id]]),
+                y=list(data[data_cols[y_id]]),
+                z=list(data[data_cols[z_id]]),
+            ))
     fig.update_layout(
         title_text=title,
         scene = dict(
@@ -188,10 +183,11 @@ def get_figure_3d(data: pd.DataFrame, data2: pd.DataFrame = None, title: str = '
             ),
             yaxis=dict(
                 title=data_cols[y_id],
+                tickformat=y_format,
                 showspikes=False,
             ),
             zaxis=dict(
-                title=data_cols[z_id],
+                title=z_name,
                 tickformat=z_format,
                 nticks=5,
             ),

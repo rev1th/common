@@ -85,12 +85,12 @@ class LogLinear(Linear):
 # Cubic spline with free ends
 @dataclass
 class LogCubicSplineFree(Interpolator):
-    log_ys: ClassVar[list[float]] = None
 
     def __post_init__(self, xy_init):
         super().__post_init__(xy_init)
-        self.log_ys = [np.log(y) for y in self._ys]
-        self.spline_tck = interpolate.splrep(self._xs, self.log_ys)
+        log_ys = [np.log(y) for y in self._ys]
+        assert len(log_ys) > 3, 'require more than 3 coordinates for spline'
+        self.spline_tck = interpolate.splrep(self._xs, log_ys)
 
     def get_value(self, x: float) -> float:
         super()._get_value(x)
@@ -103,6 +103,7 @@ class CubicSplineNatural(Interpolator):
 
     def __post_init__(self, xy_init):
         super().__post_init__(xy_init)
+        assert len(xy_init) > 3, 'require more than 3 coordinates for spline'
         self.spline_tck = interpolate.make_interp_spline(
                             self._xs, self._ys,
                             bc_type=([(2, 0.0)], [(2, 0.0)]))

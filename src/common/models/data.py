@@ -21,6 +21,7 @@ class DataPointType(StrEnum):
     BID = 'bid'
     VOLUME = 'volume'
     MID = 'mid'
+    SPREAD = 'spread'
 
     SETTLE = 'settle'
     CLOSE = 'close'
@@ -46,6 +47,11 @@ class DataModel(dict):
         if data_type == DataPointType.MID:
             if self[DataPointType.BID] and self[DataPointType.ASK]:
                 return (self[DataPointType.BID] + self[DataPointType.ASK])/2
+            else:
+                return None
+        elif data_type == DataPointType.SPREAD:
+            if self[DataPointType.BID] and self[DataPointType.ASK]:
+                return self[DataPointType.ASK] - self[DataPointType.BID]
             else:
                 return None
         else:

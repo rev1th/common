@@ -12,6 +12,7 @@ from common.models.data_series import DataSeries
 @dataclass(config=dict(arbitrary_types_allowed = True))
 class BaseInstrument(NameClass):
     _: KW_ONLY
+    data_id: str | None = None
     _currency: Currency = Currency.USD
     _calendar: Calendar = Calendar.USEX
     _data_series: DataSeries[dtm.date, float] = field(init=False, default_factory=DataSeries)
