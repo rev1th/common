@@ -32,7 +32,7 @@ def find_root(error_f, args: tuple[any] = (), bracket: tuple[float] = None, init
                 return bracket[1]
             raise Exception(f"Solver failed with {e}")
     if not solver.converged:
-        raise Exception(f"Failed to converge after {solver.iterations} iterations due to {solver.flag}")
+        raise RuntimeError(f"Failed to converge after {solver.iterations} iterations due to {solver.flag}")
     return solver.root
 
 # good: Nelder-Mead, Powell, trust-constr

@@ -4,7 +4,7 @@ from typing import Union
 from enum import StrEnum, IntEnum
 
 
-class DataField(StrEnum):
+class InstrumentDataField(StrEnum):
     NAME = 'name'
     RIC = 'ric'
     CONTRACT = 'contract'
@@ -13,7 +13,7 @@ class DataField(StrEnum):
     LOT_SIZE = 'lotsize'
     TICK_SIZE = 'ticksize'
 
-class DataPointType(StrEnum):
+class MarketDataType(StrEnum):
     LAST = 'last'
     HIGH = 'high'
     LOW = 'low'
@@ -40,18 +40,18 @@ class SessionType(IntEnum):
     EXTENDED = 1
 
 @dataclass
-class DataModel(dict):
+class InstrumentDataModel(dict):
     # data_map: dict[Union[DataField, DataPointType], any]
 
-    def __getitem__(self, data_type: Union[DataField, DataPointType]):
-        if data_type == DataPointType.MID:
-            if self[DataPointType.BID] and self[DataPointType.ASK]:
-                return (self[DataPointType.BID] + self[DataPointType.ASK])/2
+    def __getitem__(self, data_type: Union[InstrumentDataField, MarketDataType]):
+        if data_type == MarketDataType.MID:
+            if self[MarketDataType.BID] and self[MarketDataType.ASK]:
+                return (self[MarketDataType.BID] + self[MarketDataType.ASK])/2
             else:
                 return None
-        elif data_type == DataPointType.SPREAD:
-            if self[DataPointType.BID] and self[DataPointType.ASK]:
-                return self[DataPointType.ASK] - self[DataPointType.BID]
+        elif data_type == MarketDataType.SPREAD:
+            if self[MarketDataType.BID] and self[MarketDataType.ASK]:
+                return self[MarketDataType.ASK] - self[MarketDataType.BID]
             else:
                 return None
         else:

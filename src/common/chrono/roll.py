@@ -17,7 +17,7 @@ def get_rolled_date(roll_type: RollConventionType, date: dtm.date) -> dtm.date:
         case RollConventionType.EndOfMonth:
             return (date + MonthEnd(0)).date()
         case RollConventionType.IMM:
-            raise Exception('IMM roll not implemented')
+            raise NotImplementedError('IMM roll not implemented')
 
 @dataclass
 class RollConvention:

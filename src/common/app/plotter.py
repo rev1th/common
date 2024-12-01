@@ -6,10 +6,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-def add_traces(figure, data_struct,
-               text_col: str = None,
-               group: str = None, mode: str = None, name: str = '',
-               showlegend: bool = True, **kwargs):
+def add_traces(
+        figure, data_struct, text_col: str = None,
+        group: str = None, mode: str = None, name: str = '',
+        showlegend: bool = True, **kwargs):
     if isinstance(data_struct, pd.DataFrame):
         xvalues = list(data_struct.index)
         col_id = 0
@@ -60,7 +60,7 @@ def add_traces(figure, data_struct,
                        text_col=text_col,
                        showlegend=showlegend, **kwargs)
     else:
-        raise Exception("Unrecognized datatype")
+        raise TypeError("Unrecognized datatype")
     # if isinstance(v, pd.DataFrame):
     #     v.plot(ax=ax1)
     # elif isinstance(v, pd.Series):
@@ -76,12 +76,13 @@ def add_traces(figure, data_struct,
     #     ax2.set_ylabel('Price')
     #     ax2.set_prop_cycle(cycler(color=['b', 'r', 'k', 'g', 'c', 'm', 'y']))
 
-def get_figure(data, data2=None, title: str = 'Series',
-                x_name: str = 'Time', x_format: str = '%H:%M',
-                y_name: str = 'Price', y_format: str = None,
-                y2_name: str = 'Spread', y2_format: str = None,
-                text_col: str = None, mode: str = None, mode2: str = None,
-                hovermode: str = None, legend: dict = None):
+def get_figure(
+        data, data2=None, title: str = 'Series',
+        x_name: str = 'X', x_format: str = None,
+        y_name: str = 'Y', y_format: str = None,
+        y2_name: str = 'Y2', y2_format: str = None,
+        text_col: str = None, mode: str = None, mode2: str = None,
+        hovermode: str = None, legend: dict = None):
     if data2 is not None:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         add_traces(fig, data, mode=mode, text_col=text_col)
@@ -109,18 +110,8 @@ def get_figure(data, data2=None, title: str = 'Series',
     )
     return fig
 
-def plot_series(data, data2=None, title: str = 'Series',
-                x_name: str = 'Time', x_format: str = '%H:%M',
-                y_name: str = 'Price', y_format: str = None,
-                y2_name: str = 'Spread', y2_format: str = None,
-                text_col: str = None,
-                hovermode: str = None):
-    get_figure(data, data2=data2, title=title,
-               x_name=x_name, x_format=x_format,
-               y_name=y_name, y_format=y_format,
-               y2_name=y2_name, y2_format=y2_format,
-               text_col=text_col,
-               hovermode=hovermode).show()
+def plot_series(*args, **kwargs):
+    get_figure(*args, **kwargs).show()
 
 def plot_series_multiple(data: dict[str, any], title: str = 'Multi plots',
                          x_name: str = 'Time', x_format: str = '%H:%M',
@@ -149,10 +140,11 @@ def plot_series_multiple(data: dict[str, any], title: str = 'Multi plots',
     )
     fig.show()
 
-def get_figure_3d(data: pd.DataFrame, title: str = 'Series 3D',
-                  x_id: int = 0, x_format: str = '%d-%b-%Y',
-                  y_id: int = 1, y_format: str = None, z_name: str = 'Value',
-                  z_format: str = ',.3%', mesh_ids: list[int] = [2]):
+def get_figure_3d(
+        data: pd.DataFrame, title: str = 'Series 3D',
+        x_id: int = 0, x_format: str = '%d-%b-%Y',
+        y_id: int = 1, y_format: str = None, z_name: str = 'Value',
+        z_format: str = ',.3%', mesh_ids: list[int] = [2]):
     fig = go.Figure()
     data_cols = data.columns
     for z_id in range(len(data_cols)):
@@ -180,6 +172,7 @@ def get_figure_3d(data: pd.DataFrame, title: str = 'Series 3D',
                 tickformat=x_format,
                 tickvals=list(data[data_cols[x_id]]),
                 showspikes=False,
+                autorange='reversed',
             ),
             yaxis=dict(
                 title=data_cols[y_id],
@@ -194,10 +187,3 @@ def get_figure_3d(data: pd.DataFrame, title: str = 'Series 3D',
         ),
     )
     return fig
-
-def plot_series_3d(data: pd.DataFrame, data2 = None, title: str = 'Series 3D',
-                   x_id: int = 0, x_format: str = '%d-%b-%Y',
-                   y_id: int = 1, z_id: int = 2, z_format: str = ',.2%') -> None:
-    get_figure(data, data2=data2, title=title,
-               x_id=x_id, x_format=x_format,
-               y_id=y_id, z_id=z_id, z_format=z_format).show()

@@ -53,7 +53,7 @@ class DayCount(StrEnum):
                 to_day = 30 if to_date.day == 31 else to_date.day
                 return (to_date.year-from_date.year) + (to_date.month-from_date.month)/12 + (to_day-from_day)/360
             case _:
-                raise Exception(f'{self.value} not recognized for day count fraction')
+                raise ValueError(f'{self.value} not recognized for day count fraction')
     
     def get_unit_dcf(self) -> float:
         match self.value:
@@ -64,4 +64,4 @@ class DayCount(StrEnum):
             case '30360' | '30E360':
                 return 1/360.0
             case _:
-                raise Exception(f'{self.value} not recognized for day count fraction unit')
+                raise NotImplementedError(f'{self.value} not recognized for day count fraction unit')

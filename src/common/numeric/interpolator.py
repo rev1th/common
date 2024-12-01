@@ -33,17 +33,17 @@ class Interpolator:
             return Step
         elif type == 'LogLinear':
             return LogLinear
-        elif type == 'LogCubicSplineFree':
-            return LogCubicSplineFree
+        elif type == 'LogBSpline':
+            return LogBSpline
         else:
-            raise Exception(f"{type} not supported yet")
+            raise ValueError(f"{type} not supported yet")
 
     def _get_value(self, x: float):
         if not self._extrapolate_left:
             assert x >= self._xs[0], f"Cannot interpolate {x} before start {self._xs[0]}"
 
     def get_value(self, _: float):
-        raise Exception("Abstract function")
+        raise NotImplementedError("Abstract function")
 
 
 @dataclass
@@ -84,18 +84,26 @@ class LogLinear(Linear):
 
 # Cubic spline with free ends
 @dataclass
-class LogCubicSplineFree(Interpolator):
+class BSpline(Interpolator):
 
     def __post_init__(self, xy_init):
         super().__post_init__(xy_init)
-        log_ys = [np.log(y) for y in self._ys]
-        assert len(log_ys) > 3, 'require more than 3 coordinates for spline'
-        self.spline_tck = interpolate.splrep(self._xs, log_ys)
+        assert len(self._ys) > 3, 'require more than 3 coordinates for B-spline'
+        self.spline_tck = interpolate.splrep(self._xs, self._ys)
 
     def get_value(self, x: float) -> float:
         super()._get_value(x)
-        return np.exp(interpolate.splev(x, self.spline_tck))
+        return interpolate.splev(x, self.spline_tck)
 
+@dataclass
+class LogBSpline(Interpolator):
+
+    def __post_init__(self, xy_init):
+        xly_init = [(x, np.log(y)) for x, y in xy_init]
+        super().__post_init__(xly_init)
+
+    def get_value(self, x: float) -> float:
+        return np.exp(super().get_value(x))
 
 # Natural Cubic spline with f''(x) = 0 at both ends
 @dataclass

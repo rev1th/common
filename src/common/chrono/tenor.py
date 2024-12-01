@@ -1,6 +1,5 @@
-
 from pydantic.dataclasses import dataclass
-from typing import Union, Iterable, Optional
+from typing import Union, Iterable
 import datetime as dtm
 from zoneinfo import ZoneInfo
 from pandas.tseries.offsets import DateOffset, MonthEnd, QuarterEnd, YearEnd, MonthBegin, CustomBusinessDay as CBDay
@@ -26,7 +25,7 @@ def parseTenor(offsets: Union[str, tuple[str, str]]) -> DateOffset:
         offset = offsets[0]
         bdc = get_bdc(offsets[1]) if offsets[1] else None
     if len(offset) < 2:
-        raise Exception(f'Invalid input {offset}')
+        raise ValueError(f'Invalid input {offset}')
     if len(offset) > 3:
         offset_int = str_to_int(offset[:-3])
         match offset[-3:].upper():
@@ -56,7 +55,7 @@ def parseTenor(offsets: Union[str, tuple[str, str]]) -> DateOffset:
 
 @dataclass(config=dict(arbitrary_types_allowed = True))
 class Tenor:
-    _code: Union[str, tuple[str, Optional[str]], DateOffset]
+    _code: Union[str, tuple[str, str | None], DateOffset]
     
     def __post_init__(self):
         if isinstance(self._code, str) or isinstance(self._code, tuple):
@@ -100,12 +99,12 @@ class Tenor:
         return bd_adjust.get_date(self._get_date(date))
     
     # Generates schedule with Tenor for [from_date, to_date]
-    def generate_series(self, from_date: dtm.date, to_date: dtm.date,
-                        step_backward: bool = False,
-                        bd_adjust = BDayAdjust(),
-                        roll_convention = RollConvention(),
-                        extended: bool = False, inclusive: bool = False,
-                        ) -> list[dtm.date]:
+    def generate_series(
+            self, from_date: dtm.date, to_date: dtm.date,
+            step_backward: bool = False, bd_adjust = BDayAdjust(),
+            roll_convention = RollConvention(),
+            extended: bool = False, inclusive: bool = False,
+            ) -> list[dtm.date]:
         schedule = []
         if step_backward:
             if roll_convention.is_eom():
@@ -150,8 +149,9 @@ def get_bdate_series(from_date: dtm.date, to_date: dtm.date, calendar: Union[Cal
     return Tenor.bday(1, calendar=calendar).generate_series(from_date_adj, to_date, inclusive=True)
 
 # Returns last business date
-def get_last_valuation_date(timezone: str = None, calendar: Union[Calendar, str] = None,
-                            roll_hour: int = 18, roll_minute: int = 0) -> dtm.date:
+def get_last_business_date(
+        timezone: str = None, calendar: Union[Calendar, str] = None,
+        roll_hour: int = 18, roll_minute: int = 0) -> dtm.date:
     sys_dtm = dtm.datetime.now()
     val_dtm = sys_dtm.astimezone(ZoneInfo(timezone) if timezone else None)
     val_dt = get_adjusted_date(BDayAdjustType.Previous, val_dtm.date(), calendar=calendar)
@@ -162,8 +162,9 @@ def get_last_valuation_date(timezone: str = None, calendar: Union[Calendar, str]
     return val_dtm.date()
 
 # Returns current business date rolling forward on holiday
-def get_current_valuation_date(timezone: str = None, calendar: Union[Calendar, str] = None,
-                               roll_hour: int = 18, roll_minute: int = 0) -> dtm.date:
+def get_current_business_date(
+        timezone: str = None, calendar: Union[Calendar, str] = None,
+        roll_hour: int = 18, roll_minute: int = 0) -> dtm.date:
     sys_dtm = dtm.datetime.now()
     val_dtm = sys_dtm.astimezone(ZoneInfo(timezone) if timezone else None)
     val_dt = get_adjusted_date(BDayAdjustType.Following, val_dtm.date(), calendar=calendar)
