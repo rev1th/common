@@ -1,10 +1,9 @@
 from pydantic.dataclasses import dataclass
 from typing import Union, Iterable
 import datetime as dtm
-from zoneinfo import ZoneInfo
 from pandas.tseries.offsets import DateOffset, MonthEnd, QuarterEnd, YearEnd, MonthBegin, CustomBusinessDay as CBDay
 
-from .calendar import get_bdc, Calendar
+from .calendar import CalendarContext, CalendarID
 from .badjust import BDayAdjust, BDayAdjustType, get_adjusted_date
 from .roll import RollConvention
 
@@ -14,21 +13,21 @@ def str_to_int(str_int: str) -> int:
         return int(str_int)
     return None
 
-def is_eom(date: dtm.date):
-    next_day = date + dtm.timedelta(days=1)
+def is_eom(date: dtm.date, calendar: CalendarID | str | None):
+    next_day = Tenor.bday(1, calendar).get_date_simple(date)
     return next_day.month != date.month
 
-def parseTenor(offsets: Union[str, tuple[str, str]]) -> DateOffset:
-    if isinstance(offsets, str):
-        offset, bdc = offsets, None
+def parseTenor(offset: Union[str, tuple[str, str]]) -> DateOffset:
+    if isinstance(offset, tuple):
+        assert len(offset) == 2, ValueError(f'Expect tuple of size 2 {offset}')
+        code = offset[0]
+        bdc = CalendarContext().get_bdc(offset[1])
     else:
-        offset = offsets[0]
-        bdc = get_bdc(offsets[1]) if offsets[1] else None
-    if len(offset) < 2:
-        raise ValueError(f'Invalid input {offset}')
-    if len(offset) > 3:
-        offset_int = str_to_int(offset[:-3])
-        match offset[-3:].upper():
+        code, bdc = offset, None
+    assert len(code) >= 2, ValueError(f'Invalid input {code}')
+    if len(code) > 3:
+        offset_int = str_to_int(code[:-3])
+        match code[-3:].upper():
             case 'BOM'|'SOM':
                 return MonthBegin(n=offset_int)
             case 'EOM':
@@ -37,140 +36,130 @@ def parseTenor(offsets: Union[str, tuple[str, str]]) -> DateOffset:
                 return QuarterEnd(n=offset_int)
             case 'EOY':
                 return YearEnd(n=offset_int)
-    offset_int = str_to_int(offset[:-1])
-    match offset[-1]:
+    offset_int = str_to_int(code[:-1])
+    match code[-1]:
         case 'B' | 'b':
             return CBDay(n=offset_int, calendar=bdc)
         case 'Y' | 'y':
             return DateOffset(years=offset_int)
         case 'M' | 'm':
+            # rolls back to month end e.g. 31-Jan-2024 + 1m = 29-Feb-2024
             return DateOffset(months=offset_int)
         case 'W' | 'w':
             return DateOffset(weeks=offset_int)
         case 'D' | 'd':
             return DateOffset(days=offset_int)
         case _:
-            raise RuntimeError(f'Cannot parse tenor {offset}')
+            raise RuntimeError(f'Cannot parse tenor {code}')
 
 
 @dataclass(config=dict(arbitrary_types_allowed = True))
 class Tenor:
-    _code: Union[str, tuple[str, str | None], DateOffset]
+    _code: Union[str, tuple[str, str]]
+    _offsets: list[DateOffset] = None
     
     def __post_init__(self):
-        if isinstance(self._code, str) or isinstance(self._code, tuple):
-            self._offset = parseTenor(self._code)
-        else:
-            self._offset = self._code
+        if not self._offsets:
+            self._offsets = [parseTenor(self._code)]
     
     def __add__(self, new):
-        offsets = self._offset if isinstance(self._offset, Iterable) else [self._offset]
-        if isinstance(new._offset, Iterable):
-            offsets.extend(new._offset)
-        else:
-            offsets.append(new._offset)
-        return Tenor(offsets)
+        return Tenor(self._code, self._offsets + new._offsets)
     
     @classmethod
-    def bday(cls, n: int = 0, calendar: Union[Calendar, str] = None):
-        return cls(CBDay(n=n, calendar=get_bdc(calendar)))
+    def bday(cls, n: int = 0, calendar: Union[CalendarID, str] = None):
+        return cls(f'{n}b', [CBDay(n=n, calendar=CalendarContext().get_bdc(calendar))])
     
-    @property
-    def is_backward(self) -> dtm.date:
-        offset = self._offset
-        if isinstance(offset, DateOffset):
-            return offset.n < 0
-        elif isinstance(offset, Iterable):
-            return offset[0].n < 0
-        return False
+    def is_monthly(self):
+        for offset in self._offsets:
+            if getattr(offset, 'months', 0) == 0 and getattr(offset, 'years', 0) == 0:
+                return False
+        return True
     
-    def _get_date(self, date: dtm.date = None) -> dtm.date:
-        offset = self._offset
-        if isinstance(offset, DateOffset):
-            return (date + offset).date()
-        elif isinstance(offset, Iterable):
-            res = date
-            for off_i in offset:
-                res = res + off_i
-            return res.date()
-        return date + offset
+    def get_date_simple(self, date: dtm.date = None) -> dtm.date:
+        res = date
+        for offset in self._offsets:
+            res = res + offset
+        return res.date()
     
     def get_date(self, date: dtm.date = None, bd_adjust = BDayAdjust()) -> dtm.date:
-        return bd_adjust.get_date(self._get_date(date))
+        return bd_adjust.get_date(self.get_date_simple(date))
+    
+    def get_valid_roll(self, date: dtm.date, roll_convention: RollConvention, bd_adjust = BDayAdjust()):
+        if roll_convention.is_eom() and not (self.is_monthly() and is_eom(date, bd_adjust._calendar)):
+            return RollConvention()
+        return roll_convention
+    
+    def get_rolled_date(self, date: dtm.date, roll_convention_v: RollConvention, bd_adjust = BDayAdjust()):
+        roll_convention_v = self.get_valid_roll(date, roll_convention_v, bd_adjust)
+        return bd_adjust.get_date(roll_convention_v.get_date(self.get_date_simple(date)))
     
     # Generates schedule with Tenor for [from_date, to_date]
     def generate_series(
             self, from_date: dtm.date, to_date: dtm.date,
             step_backward: bool = False, bd_adjust = BDayAdjust(),
             roll_convention = RollConvention(),
-            extended: bool = False, inclusive: bool = False,
+            extend_last: bool = False, inclusive: bool = False,
             ) -> list[dtm.date]:
         schedule = []
         if step_backward:
-            if roll_convention.is_eom():
-                if not is_eom(to_date):
-                    roll_convention = RollConvention()
+            roll_convention = self.get_valid_roll(to_date, roll_convention, bd_adjust)
             date_i = to_date
             while date_i > from_date:
-                date_i_adj = bd_adjust.get_date(roll_convention.get_date(date_i))
+                date_i_adj = bd_adjust.get_date(date_i)
                 # ensure still within period after adjustment
                 if date_i_adj > from_date:
                     schedule.append(date_i_adj)
-                    date_i = self.get_date(date_i)
+                    date_i = roll_convention.get_date(self.get_date_simple(date_i))
                     # move prior to adjusted
                     while date_i >= date_i_adj:
-                        date_i = self.get_date(date_i)
+                        date_i = self.get_date_simple(date_i)
                 else:
                     break
-            if (inclusive and date_i == from_date) or extended:
-                date_i_adj = bd_adjust.get_date(roll_convention.get_date(date_i))
+            if extend_last or (inclusive and date_i >= from_date):
+                # extend last step to at or below bound
+                date_i_adj = bd_adjust.get_date(date_i)
                 schedule.append(date_i_adj)
             schedule.reverse()
         else:
+            roll_convention = self.get_valid_roll(from_date, roll_convention, bd_adjust)
             date_i = from_date
             while date_i < to_date:
-                date_i_adj = bd_adjust.get_date(roll_convention.get_date(date_i))
+                date_i_adj = bd_adjust.get_date(date_i)
                 if date_i_adj < to_date:
                     schedule.append(date_i_adj)
-                    date_i = self.get_date(date_i)
+                    date_i = roll_convention.get_date(self.get_date_simple(date_i))
                     while date_i <= date_i_adj:
-                        date_i = self.get_date(date_i)
+                        date_i = self.get_date_simple(date_i)
                 else:
                     break
-            if (inclusive and date_i == to_date) or extended:
-                date_i_adj = bd_adjust.get_date(roll_convention.get_date(date_i))
+            if extend_last or (inclusive and date_i <= to_date):
+                date_i_adj = bd_adjust.get_date(date_i)
                 schedule.append(date_i_adj)
         return schedule
 
 
-# Return all business dates over a period
-def get_bdate_series(from_date: dtm.date, to_date: dtm.date, calendar: Union[Calendar, str] = None) -> list[dtm.date]:
+# Return all business dates
+def get_bdate_series(from_date: dtm.date, to_date: dtm.date, calendar: Union[CalendarID, str] = None) -> list[dtm.date]:
     from_date_adj = get_adjusted_date(BDayAdjustType.Following, from_date, calendar=calendar)
     return Tenor.bday(1, calendar=calendar).generate_series(from_date_adj, to_date, inclusive=True)
 
 # Returns last business date
-def get_last_business_date(
-        timezone: str = None, calendar: Union[Calendar, str] = None,
-        roll_hour: int = 18, roll_minute: int = 0) -> dtm.date:
-    sys_dtm = dtm.datetime.now()
-    val_dtm = sys_dtm.astimezone(ZoneInfo(timezone) if timezone else None)
-    val_dt = get_adjusted_date(BDayAdjustType.Previous, val_dtm.date(), calendar=calendar)
+def get_last_business_date(calendar: Union[CalendarID, str] = None, roll_time: dtm.time = None) -> dtm.date:
+    val_dtm = dtm.datetime.now(roll_time.tzinfo if roll_time else None)
+    val_dt = get_adjusted_date(BDayAdjustType.Preceding, val_dtm.date(), calendar=calendar)
     if val_dt < val_dtm.date():
         return val_dt
-    if val_dtm.hour < roll_hour or (val_dtm.hour == roll_hour and val_dtm.minute < roll_minute):
-        return Tenor(('-1B', calendar)).get_date(val_dt)
+    if roll_time and val_dtm.time() < roll_time:
+        return Tenor.bday(-1, calendar).get_date_simple(val_dt)
     return val_dtm.date()
 
 # Returns current business date rolling forward on holiday
-def get_current_business_date(
-        timezone: str = None, calendar: Union[Calendar, str] = None,
-        roll_hour: int = 18, roll_minute: int = 0) -> dtm.date:
-    sys_dtm = dtm.datetime.now()
-    val_dtm = sys_dtm.astimezone(ZoneInfo(timezone) if timezone else None)
+def get_current_business_date(calendar: Union[CalendarID, str] = None, roll_time: dtm.time = None) -> dtm.date:
+    val_dtm = dtm.datetime.now(roll_time.tzinfo if roll_time else None)
     val_dt = get_adjusted_date(BDayAdjustType.Following, val_dtm.date(), calendar=calendar)
     if val_dt > val_dtm.date():
         return val_dt
-    if val_dtm.hour > roll_hour or (val_dtm.hour == roll_hour and val_dtm.minute >= roll_minute):
-        return Tenor(('1B', calendar)).get_date(val_dt)
+    if roll_time and val_dtm.time() >= roll_time:
+        return Tenor.bday(1, calendar).get_date_simple(val_dt)
     return val_dtm.date()
 

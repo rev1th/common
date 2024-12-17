@@ -1,6 +1,4 @@
-
 from pydantic.dataclasses import dataclass
-from typing import Optional
 from enum import StrEnum
 import datetime as dtm
 from pandas.tseries.offsets import MonthEnd
@@ -21,7 +19,7 @@ def get_rolled_date(roll_type: RollConventionType, date: dtm.date) -> dtm.date:
 
 @dataclass
 class RollConvention:
-    _type: Optional[RollConventionType] = None
+    _type: RollConventionType | None = None
 
     def is_eom(self):
         return self._type == RollConventionType.EndOfMonth

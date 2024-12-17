@@ -4,7 +4,7 @@ import datetime as dtm
 
 from common.base_class import NameClass
 from common.currency import Currency
-from common.chrono import Calendar
+from common.chrono import CalendarID
 from common.models.data_series import DataSeries
 
 # No validators for non-default classes like SortedDict, pandas.DataFrame
@@ -14,7 +14,7 @@ class BaseInstrument(NameClass):
     _: KW_ONLY
     data_id: str | None = None
     _currency: Currency = Currency.USD
-    _calendar: Calendar = Calendar.USEX
+    _calendar: CalendarID = CalendarID.USEX
     _data_series: DataSeries[dtm.date, float] = field(init=False, default_factory=DataSeries)
 
     @property

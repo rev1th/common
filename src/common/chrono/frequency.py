@@ -1,4 +1,3 @@
-
 from enum import StrEnum
 from typing import Union
 import datetime as dtm
@@ -54,13 +53,12 @@ class Frequency(StrEnum):
                           bd_adjust = BDayAdjust(),
                           roll_convention = RollConvention(),
                           step_backward = True,
-                          extended = False) -> list[dtm.date]:
+                          extend_last = False) -> list[dtm.date]:
         start_date = start if isinstance(start, dtm.date) else start.get_date(ref_date)
         end_date = end if isinstance(end, dtm.date) else end.get_date(start_date)
-
         return self.to_tenor(backward=step_backward).generate_series(
             start_date, end_date, roll_convention=roll_convention,
-            step_backward=step_backward, bd_adjust=bd_adjust, extended=extended)
+            step_backward=step_backward, bd_adjust=bd_adjust, extend_last=extend_last)
 
 
 class Compounding(StrEnum):
