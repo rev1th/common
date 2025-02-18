@@ -14,14 +14,17 @@ def get_form_style(**kwargs):
 # _TABLE_KWARGS = dict(sort_action='native', sort_mode='multi', sort_by=[],
 #                 filter_action='native')
 
-def get_grid_style(page_size: int = 50, height: int = 900, **kwargs):
+def get_grid_style(height: int = 800, page_size: int = None, **kwargs):
     grid_options = {
-        'pagination': True, 'paginationPageSize': page_size, 'animateRows': False,
-        'enableCellTextSelection': True,
+        'animateRows': False, 
+        'enableCellTextSelection': True, 'rowSelection': 'multiple',
+        'groupDisplayType': 'multipleColumns',
     }
+    if page_size:
+        grid_options.update({'pagination': True, 'paginationPageSize': page_size})
     return dict(
-        defaultColDef = {'filter': True, 'floatingFilter': True},
-        columnSize='sizeToFit',
+        defaultColDef = {'filter': True},
+        columnSize='responsiveSizeToFit',
         dashGridOptions=grid_options,
         style={'height': height},
         **kwargs
