@@ -1,5 +1,4 @@
 from enum import StrEnum
-from typing import Union
 import datetime as dtm
 import numpy as np
 
@@ -48,7 +47,7 @@ class Frequency(StrEnum):
         except KeyError:
             raise RuntimeError(f'Invalid coupon frequency {self.value}')
     
-    def generate_schedule(self, start: Union[dtm.date, Tenor], end: Union[dtm.date, Tenor],
+    def generate_schedule(self, start: dtm.date | Tenor, end: dtm.date | Tenor,
                           ref_date: dtm.date = None,
                           bd_adjust = BDayAdjust(),
                           roll_convention = RollConvention(),
@@ -68,7 +67,7 @@ class Compounding(StrEnum):
     Quarterly = 'Q'
     Monthly = 'M'
     Daily = 'D'
-    Continous = 'CON'
+    Continuous = 'CON'
     Simple = 'SIM'
 
     def get_rate(self, df: float, dcf: float, dcf_unit: float = 0) -> float:

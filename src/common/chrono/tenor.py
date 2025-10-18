@@ -1,23 +1,22 @@
 from pydantic.dataclasses import dataclass
-from typing import Union, Iterable
 import datetime as dtm
 from pandas.tseries.offsets import DateOffset, MonthEnd, QuarterEnd, YearEnd, MonthBegin, CustomBusinessDay as CBDay
 
 from .calendar import CalendarContext, CalendarID
-from .badjust import BDayAdjust, BDayAdjustType, get_adjusted_date
+from .badjust import BDayAdjust
 from .roll import RollConvention
 
 
 def str_to_int(str_int: str) -> int:
     if str_int.isdigit() or (str_int[0] == '-' and str_int[1:].isdigit()):
         return int(str_int)
-    return None
+    raise ValueError(str_int)
 
 def is_eom(date: dtm.date, calendar: CalendarID | str | None):
     next_day = Tenor.bday(1, calendar).get_date_simple(date)
     return next_day.month != date.month
 
-def parseTenor(offset: Union[str, tuple[str, str]]) -> DateOffset:
+def parse_tenor(offset: str | tuple[str, str]):
     if isinstance(offset, tuple):
         assert len(offset) == 2, ValueError(f'Expect tuple of size 2 {offset}')
         code = offset[0]
@@ -55,18 +54,18 @@ def parseTenor(offset: Union[str, tuple[str, str]]) -> DateOffset:
 
 @dataclass(config=dict(arbitrary_types_allowed = True))
 class Tenor:
-    _code: Union[str, tuple[str, str]]
-    _offsets: list[DateOffset] = None
+    _code: str | tuple[str, str]
+    _offsets: list[DateOffset | CBDay] = None
     
     def __post_init__(self):
         if not self._offsets:
-            self._offsets = [parseTenor(self._code)]
+            self._offsets = [parse_tenor(self._code)]
     
     def __add__(self, new):
         return Tenor(self._code, self._offsets + new._offsets)
     
     @classmethod
-    def bday(cls, n: int = 0, calendar: Union[CalendarID, str] = None):
+    def bday(cls, n: int = 0, calendar: CalendarID | str = None):
         return cls(f'{n}b', [CBDay(n=n, calendar=CalendarContext().get_bdc(calendar))])
     
     def is_monthly(self):
@@ -136,30 +135,4 @@ class Tenor:
                 date_i_adj = bd_adjust.get_date(date_i)
                 schedule.append(date_i_adj)
         return schedule
-
-
-# Return all business dates
-def get_bdate_series(from_date: dtm.date, to_date: dtm.date, calendar: Union[CalendarID, str] = None) -> list[dtm.date]:
-    from_date_adj = get_adjusted_date(BDayAdjustType.Following, from_date, calendar=calendar)
-    return Tenor.bday(1, calendar=calendar).generate_series(from_date_adj, to_date, inclusive=True)
-
-# Returns last business date
-def get_last_business_date(calendar: Union[CalendarID, str] = None, roll_time: dtm.time = None) -> dtm.date:
-    val_dtm = dtm.datetime.now(roll_time.tzinfo if roll_time else None)
-    val_dt = get_adjusted_date(BDayAdjustType.Preceding, val_dtm.date(), calendar=calendar)
-    if val_dt < val_dtm.date():
-        return val_dt
-    if roll_time and val_dtm.time() < roll_time:
-        return Tenor.bday(-1, calendar).get_date_simple(val_dt)
-    return val_dtm.date()
-
-# Returns current business date rolling forward on holiday
-def get_current_business_date(calendar: Union[CalendarID, str] = None, roll_time: dtm.time = None) -> dtm.date:
-    val_dtm = dtm.datetime.now(roll_time.tzinfo if roll_time else None)
-    val_dt = get_adjusted_date(BDayAdjustType.Following, val_dtm.date(), calendar=calendar)
-    if val_dt > val_dtm.date():
-        return val_dt
-    if roll_time and val_dtm.time() >= roll_time:
-        return Tenor.bday(1, calendar).get_date_simple(val_dt)
-    return val_dtm.date()
 

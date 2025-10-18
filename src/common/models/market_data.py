@@ -1,6 +1,4 @@
-
 from pydantic.dataclasses import dataclass
-from typing import Union
 from enum import StrEnum, IntEnum
 
 
@@ -41,9 +39,8 @@ class SessionType(IntEnum):
 
 @dataclass
 class InstrumentDataModel(dict):
-    # data_map: dict[Union[DataField, DataPointType], any]
 
-    def __getitem__(self, data_type: Union[InstrumentDataField, MarketDataType]):
+    def __getitem__(self, data_type: InstrumentDataField | MarketDataType):
         if data_type == MarketDataType.MID:
             if self[MarketDataType.BID] and self[MarketDataType.ASK]:
                 return (self[MarketDataType.BID] + self[MarketDataType.ASK])/2

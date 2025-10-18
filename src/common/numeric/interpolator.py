@@ -1,7 +1,5 @@
-
 from pydantic.dataclasses import dataclass
 from dataclasses import InitVar, field
-from typing import ClassVar
 import numpy as np
 from scipy import interpolate
 import bisect
@@ -10,10 +8,10 @@ import bisect
 @dataclass
 class Interpolator:
     _xy_init: InitVar[list[tuple[float, float]]]
-    _extrapolate_left: bool = field(kw_only=True, default=False)
+    extrapolate_left: bool = field(kw_only=True, default=False)
     
-    _xs: ClassVar[list[float]]
-    _ys: ClassVar[list[float]]
+    _xs: list[float] = field(init=False)
+    _ys: list[float] = field(init=False)
 
     def __post_init__(self, xy_init):
         self._xs, self._ys = zip(*xy_init)
@@ -26,7 +24,7 @@ class Interpolator:
         return len(self._xs)
     
     @classmethod
-    def fromString(cls, type: str):
+    def from_string(cls, type: str):
         if type in ('LogCubic', 'LogCubicSplineNatural'):
             return LogCubicSplineNatural
         elif type == 'Step':
@@ -39,7 +37,7 @@ class Interpolator:
             raise ValueError(f"{type} not supported yet")
 
     def _get_value(self, x: float):
-        if not self._extrapolate_left:
+        if not self.extrapolate_left:
             assert x >= self._xs[0], f"Cannot interpolate {x} before start {self._xs[0]}"
 
     def get_value(self, _: float):
