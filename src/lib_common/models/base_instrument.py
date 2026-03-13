@@ -2,10 +2,10 @@ from pydantic.dataclasses import dataclass
 from dataclasses import field, KW_ONLY
 import datetime as dtm
 
-from common.base_class import NameClass
-from common.currency import Currency
-from common.chrono.calendar import CalendarID
-from common.models.data_series import DataSeries
+from lib_common.base_class import NameClass
+from lib_common.currency import Currency
+from lib_common.chrono.calendar import CalendarID
+from lib_common.models.data_series import DataSeries
 
 # No validators for non-default classes like SortedDict, pandas.DataFrame
 # https://docs.pydantic.dev/latest/usage/model_config/#arbitrary-types-allowed

@@ -24,17 +24,17 @@ class Interpolator:
         return len(self._xs)
     
     @classmethod
-    def from_string(cls, type: str):
-        if type in ('LogCubic', 'LogCubicSplineNatural'):
+    def from_string(cls, name: str):
+        if name in ('LogCubic', 'LogCubicSplineNatural'):
             return LogCubicSplineNatural
-        elif type == 'Step':
+        elif name == 'Step':
             return Step
-        elif type == 'LogLinear':
+        elif name == 'LogLinear':
             return LogLinear
-        elif type == 'LogBSpline':
+        elif name == 'LogBSpline':
             return LogBSpline
         else:
-            raise ValueError(f"{type} not supported yet")
+            raise ValueError(f"{name} not supported yet")
 
     def _get_value(self, x: float):
         if not self.extrapolate_left:

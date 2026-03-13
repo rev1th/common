@@ -1,13 +1,17 @@
 import datetime as dtm
 
-from common.chrono.badjust import BDayAdjustType, get_adjusted_date
-from common.chrono.calendar import CalendarID
-from common.chrono.tenor import Tenor
+from lib_common.chrono.badjust import BDayAdjustType, get_adjusted_date
+from lib_common.chrono.calendar import CalendarID
+from lib_common.chrono.tenor import Tenor
 
 # Return all business dates
-def get_bdate_series(from_date: dtm.date, to_date: dtm.date, calendar: CalendarID | str = None) -> list[dtm.date]:
-    from_date_adj = get_adjusted_date(BDayAdjustType.Following, from_date, calendar=calendar)
-    return Tenor.bday(1, calendar=calendar).generate_series(from_date_adj, to_date, inclusive=True)
+def get_bdate_series(
+    from_date: dtm.date, to_date: dtm.date, calendar: CalendarID | str = None,
+    from_adjust = BDayAdjustType.Following, to_adjust = BDayAdjustType.Preceding,
+) -> list[dtm.date]:
+    from_date_adj = get_adjusted_date(from_adjust, from_date, calendar)
+    to_date_adj = get_adjusted_date(to_adjust, to_date, calendar)
+    return Tenor.bday(1, calendar=calendar).generate_series(from_date_adj, to_date_adj, inclusive=True)
 
 # Returns last business date
 def get_last_business_date(calendar: CalendarID | str = None, roll_time: dtm.time = None) -> dtm.date:

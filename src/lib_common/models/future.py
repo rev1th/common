@@ -3,7 +3,7 @@ from dataclasses import field
 import datetime as dtm
 from typing import Self
 
-from common.models.base_instrument import BaseInstrument
+from lib_common.models.base_instrument import BaseInstrument
 
 @dataclass
 class Future(BaseInstrument):

@@ -11,9 +11,7 @@ class BDayAdjustType(StrEnum):
     Preceding = 'P'
     ModifiedFollowing = 'MF'
 
-def get_adjusted_date(
-        adjust_type: BDayAdjustType, date: dtm.date,
-        calendar: Optional[CalendarID] = None) -> dtm.date:
+def get_adjusted_date(adjust_type: BDayAdjustType, date: dtm.date, calendar: CalendarID = None) -> dtm.date:
     match adjust_type:
         case BDayAdjustType.Following:
             return (date + CBDay(0, calendar=CalendarContext().get_bdc(calendar))).date()
