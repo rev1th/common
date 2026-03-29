@@ -1,9 +1,10 @@
 # Setup
 ```
-python setup.py clean --all bdist_wheel
+python setup.py clean --all
+python -m build --wheel
 ```
 
 ## (Re)Install **common** package
 ```
-pip install --force-reinstall --no-deps ..\common\dist\lib_common-1.0-py3-none-any.whl
+pip install --force-reinstall --no-deps git+https://github.com/rev1th/common.git@main#egg=lib_common
 ```
